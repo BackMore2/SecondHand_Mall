@@ -16,4 +16,8 @@ public interface UserService {
     User register(User user);
     User login(String credential, String password);
     Optional<User> findByUsername(String username);
+    
+    // 密码相关方法
+    boolean checkPassword(User user, String password);
+    void updatePassword(User user, String newPassword);
 }
