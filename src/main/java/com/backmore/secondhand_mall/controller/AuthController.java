@@ -1,11 +1,14 @@
 package com.backmore.secondhand_mall.controller;
 
-import com.backmore.secondhand_mall.dto.LoginRequest;
 import com.backmore.secondhand_mall.entity.User;
 import com.backmore.secondhand_mall.service.UserService;
+import com.backmore.secondhand_mall.util.JwtUtil;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+
+import java.util.HashMap;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/auth")
@@ -14,6 +17,9 @@ public class AuthController {
 
     @Autowired
     private UserService userService;
+
+    @Autowired
+    private JwtUtil jwtUtil;
 
     @PostMapping("/register")
     public ResponseEntity<?> register(@RequestBody User user) {
@@ -27,28 +33,46 @@ public class AuthController {
             }
 
             User registeredUser = userService.register(user);
-            return ResponseEntity.ok(registeredUser);
+            
+            // 生成 token
+            String token = jwtUtil.generateToken(registeredUser.getUsername(), registeredUser.getId());
+            
+            // 构建响应
+            Map<String, Object> response = new HashMap<>();
+            response.put("user", registeredUser);
+            response.put("token", token);
+            
+            return ResponseEntity.ok(response);
         } catch (RuntimeException e) {
             return ResponseEntity.badRequest().body(e.getMessage());
         }
     }
 
     @PostMapping("/login")
-    public ResponseEntity<?> login(@RequestBody LoginRequest loginRequest) {
+    public ResponseEntity<?> login(@RequestBody Map<String, String> loginRequest) {
         try {
             // 手动验证参数
             if (loginRequest == null) {
                 return ResponseEntity.badRequest().body("请求参数不能为空");
             }
-            if (loginRequest.getCredential() == null || loginRequest.getCredential().trim().isEmpty()) {
+            if (loginRequest.get("credential") == null || loginRequest.get("credential").trim().isEmpty()) {
                 return ResponseEntity.badRequest().body("登录凭证不能为空");
             }
-            if (loginRequest.getPassword() == null || loginRequest.getPassword().trim().isEmpty()) {
+            if (loginRequest.get("password") == null || loginRequest.get("password").trim().isEmpty()) {
                 return ResponseEntity.badRequest().body("密码不能为空");
             }
 
-            User user = userService.login(loginRequest.getCredential(), loginRequest.getPassword());
-            return ResponseEntity.ok(user);
+            User user = userService.login(loginRequest.get("credential"), loginRequest.get("password"));
+            
+            // 生成 token
+            String token = jwtUtil.generateToken(user.getUsername(), user.getId());
+            
+            // 构建响应
+            Map<String, Object> response = new HashMap<>();
+            response.put("user", user);
+            response.put("token", token);
+            
+            return ResponseEntity.ok(response);
         } catch (RuntimeException e) {
             return ResponseEntity.badRequest().body(e.getMessage());
         }

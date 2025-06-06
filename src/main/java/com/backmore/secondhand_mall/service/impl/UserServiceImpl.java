@@ -55,7 +55,7 @@ public class UserServiceImpl implements UserService {
         // 密码加密
         user.setPassword(passwordEncoder.encode(user.getPassword()));
         user.setStatus(true); // 默认正常
-        user.setAdmin(false); // 默认普通用户
+        user.setIsAdmin(false); // 默认普通用户
         return userRepository.save(user);
     }
 

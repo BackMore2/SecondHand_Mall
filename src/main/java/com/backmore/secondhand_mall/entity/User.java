@@ -89,12 +89,12 @@ public class User {
         this.avatar = avatar;
     }
 
-    public Boolean isAdmin() {
+    public Boolean getIsAdmin() {
         return isAdmin;
     }
 
-    public void setAdmin(Boolean admin) {
-        isAdmin = admin;
+    public void setIsAdmin(Boolean isAdmin) {
+        this.isAdmin = isAdmin;
     }
 
     public Boolean getStatus() {
