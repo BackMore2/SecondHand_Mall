@@ -1,5 +1,12 @@
 <template>
   <div class="home-page">
+    <!-- Toast提示组件 -->
+    <transition name="toast-fade">
+      <div v-if="toastVisible" :class="['toast', `toast-${toastType}`]">
+        {{ toastMessage }}
+      </div>
+    </transition>
+
     <!-- 使用共用导航组件 -->
     <NavBar />
 
@@ -18,7 +25,7 @@
             :key="category.id"
             @click="selectCategory(category.id)"
             :class="{ active: selectedCategory === category.id }"
-            :style="{ '--category-color': category.color }"
+            :style="{ borderColor: selectedCategory === category.id ? category.color : 'transparent' }"
           >
             <div class="category-icon" :style="{ backgroundColor: category.color }">
               {{ category.name.slice(0, 1) }}
@@ -86,16 +93,30 @@
           <div class="section-info">找到 <span class="result-count">{{ filteredProducts.length }}</span> 个商品</div>
         </div>
 
-    <!-- 商品列表 -->
-        <div v-if="filteredProducts.length > 0" class="product-list">
+        <!-- 加载状态 -->
+        <div v-if="isLoading" class="loading-container">
+          <div class="loading-spinner"></div>
+          <p class="loading-text">正在加载商品数据...</p>
+        </div>
+        
+        <!-- 错误状态 -->
+        <div v-else-if="loadError" class="error-container">
+          <div class="error-icon"></div>
+          <h3 class="error-title">加载失败</h3>
+          <p class="error-message">{{ loadError }}</p>
+          <button class="retry-button" @click="retryLoading">重新加载</button>
+        </div>
+        
+        <!-- 商品列表 -->
+        <div v-else-if="filteredProducts.length > 0" class="product-list">
           <div
             v-for="product in paginatedProducts"
-          :key="product.id"
-          class="product-card"
+            :key="product.id"
+            class="product-card"
             @click="viewProductDetail(product.id)"
           >
             <div class="product-image-wrap">
-              <img :src="product.image" class="product-image" :alt="product.name" />
+              <img :src="getProductImage(product)" class="product-image" :alt="product.name" />
               <div class="product-badges">
                 <span class="badge hot" v-if="product.isHot">热卖</span>
                 <span class="badge new" v-if="isNewProduct(product)">新品</span>
@@ -107,13 +128,13 @@
                 </button>
                 <button 
                   class="action-button cart" 
-                  @click.stop="cartStore.addToCart(product.id)"
-            :disabled="product.stock <= 0"
+                  @click.stop="addToCart(product.id)"
+                  :disabled="product.stock <= 0 || product.addingToCart"
                   :title="product.stock > 0 ? '加入购物车' : '已售罄'"
-        >
-                  <i class="action-icon cart-icon"></i>
+                >
+                  <i class="action-icon cart-icon" :class="{'spinning': product.addingToCart}"></i>
                 </button>
-    </div>
+              </div>
             </div>
             <div class="product-info">
               <h3 class="product-name">{{ product.name }}</h3>
@@ -200,7 +221,7 @@
                 @click="viewProductDetail(product.id)"
               >
                 <div class="item-image-container">
-                  <img :src="product.image" :alt="product.name" class="item-image" />
+                  <img :src="getProductImage(product)" :alt="product.name" class="item-image" />
                 </div>
                 <div class="item-info">
                   <div class="item-name">{{ product.name }}</div>
@@ -281,20 +302,29 @@
 
 <script setup>
 import { useCartStore } from '@/stores/cart';
+import { useProductStore } from '@/stores/product';
 import { ref, computed, onMounted, onBeforeUnmount } from 'vue';
 import { useRouter } from 'vue-router';
 import NavBar from '@/components/NavBar.vue';
 
 const router = useRouter();
 const cartStore = useCartStore();
+const productStore = useProductStore();
+
+// Toast提示相关
+const toastMessage = ref('');
+const toastVisible = ref(false);
+const toastType = ref('info'); // success, error, info
+let toastTimer = null;
 
 // 分类列表
 const categoryList = [
   { id: 1, name: '教辅材料', color: '#f56c6c' },
-  { id: 2, name: '生活用品', color: '#67c23a' },
-  { id: 3, name: '数码产品', color: '#409eff' },
-  { id: 4, name: '体育用品', color: '#e6a23c' },
-  { id: 5, name: '其他', color: '#909399' }
+  { id: 2, name: '生活用品', color: '#E6A23C' },
+  { id: 3, name: '服装衣帽', color: '#67C23A' },
+  { id: 4, name: '电子产品', color: '#409EFF' },
+  { id: 5, name: '运动健身', color: '#9370DB' },
+  { id: 6, name: '其他', color: '#34495e' }
 ];
 
 // 排序选项
@@ -307,7 +337,7 @@ const sortOptions = [
 
 // 获取分类下的商品数量
 const getCategoryCount = (categoryId) => {
-  // 这里简单模拟一下数量，实际应用中可能需要从API获取
+  // 使用productStore中的数据计算每个分类的商品数量
   return filteredProducts.value.filter(p => p.categoryId === categoryId).length;
 };
 
@@ -319,6 +349,8 @@ const onlyInStock = ref(false);
 const searchKeyword = ref('');
 const currentPage = ref(1);
 const pageSize = ref(8);
+const isLoading = ref(false);
+const loadError = ref(null);
 
 // 获取分类名称
 const getCategoryNameById = (id) => {
@@ -353,6 +385,16 @@ const resetFilters = () => {
 
 // 查看商品详情
 const viewProductDetail = (productId) => {
+  const product = productStore.getProductById(productId);
+  console.log('查看商品详情:', productId);
+  if (product) {
+    console.log('商品图片信息:', {
+      image: product.image,
+      mainImage: product.mainImage, 
+      main_image: product.main_image,
+      images: product.images
+    });
+  }
   router.push(`/product/${productId}`);
 };
 
@@ -389,7 +431,7 @@ const handlePageChange = (page) => {
 
 // 按分类获取推荐商品
 const getRecommendedProductsByCategory = (categoryId, count) => {
-  return cartStore.products
+  return productStore.products
     .filter(product => product.categoryId === categoryId)
     .slice(0, count);
 };
@@ -402,7 +444,7 @@ const searchProducts = () => {
 
 // 筛选后的商品列表
 const filteredProducts = computed(() => {
-  let result = [...cartStore.products];
+  let result = [...productStore.availableProducts];
   
   // 增强产品数据
   result = result.map(product => ({
@@ -469,22 +511,111 @@ const totalPages = computed(() => {
   return Math.ceil(filteredProducts.value.length / pageSize.value);
 });
 
-// 模拟初始化数据 - 实际应用中可能从API获取
-onMounted(() => {
-  // 扩充商品模拟数据
-  if (cartStore.products.length < 15) {
-    const additionalProducts = Array.from({ length: 13 }).map((_, index) => ({
-      id: cartStore.products.length + index + 1,
-      name: `二手商品${cartStore.products.length + index + 1}`,
-      price: Math.floor(Math.random() * 1000) + 99,
-      image: `https://dummyimage.com/200x200/${Math.floor(Math.random() * 999)}/${Math.floor(Math.random() * 999)}`,
-      stock: Math.floor(Math.random() * 10)
-    }));
-    
-    // 更新商店中的商品列表
-    cartStore.products.push(...additionalProducts);
+// 初始化数据 - 从API获取商品数据
+onMounted(async () => {
+  isLoading.value = true;
+  try {
+    console.log('开始加载商品数据...');
+    const result = await productStore.fetchProducts();
+    console.log('商品加载结果:', result);
+    console.log('当前Store中的商品数据:', productStore.products);
+    console.log('可用商品数据:', productStore.availableProducts);
+    if (!result.success) {
+      loadError.value = result.error || '加载商品数据失败';
+      console.error('加载商品失败:', loadError.value);
+    }
+  } catch (error) {
+    console.error('加载商品数据出错:', error);
+    loadError.value = '加载商品数据失败';
+  } finally {
+    isLoading.value = false;
+    console.log('加载状态结束, isLoading:', isLoading.value);
+    console.log('筛选后的商品数据:', filteredProducts.value);
   }
 });
+
+// 重新加载数据
+const retryLoading = async () => {
+  isLoading.value = true;
+  loadError.value = null;
+  try {
+    const result = await productStore.fetchProducts();
+    if (!result.success) {
+      loadError.value = result.error || '加载商品数据失败';
+    }
+  } catch (error) {
+    console.error('重新加载商品数据出错:', error);
+    loadError.value = '加载商品数据失败';
+  } finally {
+    isLoading.value = false;
+  }
+};
+
+// 获取商品图片
+const getProductImage = (product) => {
+  if (product.image) return product.image;
+  if (product.mainImage) return product.mainImage;
+  if (product.main_image) return product.main_image;
+  if (product.images && product.images.length > 0) return product.images[0];
+  // 默认图片
+  return 'https://dummyimage.com/200x200/e0e0e0/333333&text=暂无图片';
+};
+
+// 添加商品到购物车，提供更好的反馈
+async function addToCart(productId) {
+  // 获取商品信息
+  const product = productStore.getProductById(productId);
+  if (!product) return;
+  
+  if (product.stock <= 0) {
+    // 使用更友好的提示方式
+    showToast('商品已售罄', 'error');
+    return;
+  }
+  
+  try {
+    // 添加加载效果标记
+    product.addingToCart = true;
+    
+    // 调用购物车store的添加方法(默认添加1个)
+    await cartStore.addToCart(productId, 1);
+    
+    // 显示成功提示，如果有商品名称则显示
+    showToast(`成功添加 ${product.name || '商品'} 到购物车`, 'success');
+  } catch (error) {
+    console.error('添加商品到购物车失败:', error);
+    
+    // 针对不同错误显示不同提示
+    if (error === '商品库存不足') {
+      showToast('商品库存不足', 'error');
+    } else {
+      showToast('添加失败，请稍后重试', 'error');
+    }
+  } finally {
+    // 重置按钮状态
+    setTimeout(() => {
+      product.addingToCart = false;
+    }, 600);
+  }
+}
+
+// 简单的Toast提示函数
+function showToast(message, type = 'info', duration = 2000) {
+  // 清除之前的定时器
+  if (toastTimer) {
+    clearTimeout(toastTimer);
+  }
+  
+  // 设置新消息
+  toastMessage.value = message;
+  toastType.value = type;
+  toastVisible.value = true;
+  
+  // 设置自动消失
+  toastTimer = setTimeout(() => {
+    toastVisible.value = false;
+  }, duration);
+}
 </script>
 
 <style scoped>
@@ -563,12 +694,10 @@ onMounted(() => {
 .category-card:hover {
   box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
   transform: translateY(-5px);
-  border-color: var(--category-color, #4a99e9);
 }
 
 .category-card.active {
-  border-color: var(--category-color, #4a99e9);
-  background-color: rgba(var(--category-color, #4a99e9), 0.05);
+  background-color: rgba(74, 153, 233, 0.05);
 }
 
 .category-icon {
@@ -847,13 +976,25 @@ onMounted(() => {
 }
 
 .view-icon {
-  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z'%3E%3C/path%3E%3Ccircle cx='12' cy='12' r='3'%3E%3C/circle%3E%3C/svg%3E") no-repeat center center / contain;
-  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z'%3E%3C/path%3E%3Ccircle cx='12' cy='12' r='3'%3E%3C/circle%3E%3C/svg%3E") no-repeat center center / contain;
+  mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z'%3E%3C/path%3E%3Ccircle cx='12' cy='12' r='3'%3E%3C/circle%3E%3C/svg%3E");
+  mask-repeat: no-repeat;
+  mask-position: center;
+  mask-size: contain;
+  -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z'%3E%3C/path%3E%3Ccircle cx='12' cy='12' r='3'%3E%3C/circle%3E%3C/svg%3E");
+  -webkit-mask-repeat: no-repeat;
+  -webkit-mask-position: center;
+  -webkit-mask-size: contain;
 }
 
 .cart-icon {
-  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='9' cy='21' r='1'%3E%3C/circle%3E%3Ccircle cx='20' cy='21' r='1'%3E%3C/circle%3E%3Cpath d='M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6'%3E%3C/path%3E%3C/svg%3E") no-repeat center center / contain;
-  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='9' cy='21' r='1'%3E%3C/circle%3E%3Ccircle cx='20' cy='21' r='1'%3E%3C/circle%3E%3Cpath d='M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6'%3E%3C/path%3E%3C/svg%3E") no-repeat center center / contain;
+  mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='9' cy='21' r='1'%3E%3C/circle%3E%3Ccircle cx='20' cy='21' r='1'%3E%3C/circle%3E%3Cpath d='M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6'%3E%3C/path%3E%3C/svg%3E");
+  mask-repeat: no-repeat;
+  mask-position: center;
+  mask-size: contain;
+  -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='9' cy='21' r='1'%3E%3C/circle%3E%3Ccircle cx='20' cy='21' r='1'%3E%3C/circle%3E%3Cpath d='M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6'%3E%3C/path%3E%3C/svg%3E");
+  -webkit-mask-repeat: no-repeat;
+  -webkit-mask-position: center;
+  -webkit-mask-size: contain;
 }
 
 .product-info {
@@ -1336,5 +1477,141 @@ onMounted(() => {
   .footer-nav {
     justify-content: center;
   }
+}
+
+/* 加载中和错误状态样式 */
+.loading-container, .error-container {
+  padding: 50px 0;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 300px;
+  background-color: white;
+  border-radius: 8px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+}
+
+.loading-spinner {
+  width: 50px;
+  height: 50px;
+  border: 4px solid #f3f3f3;
+  border-top: 4px solid #4a99e9;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin-bottom: 15px;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.loading-text {
+  color: #666;
+  font-size: 16px;
+}
+
+.error-icon {
+  width: 60px;
+  height: 60px;
+  background-color: #fff0f0;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 15px;
+  position: relative;
+}
+
+.error-icon::before, .error-icon::after {
+  content: '';
+  position: absolute;
+  width: 30px;
+  height: 4px;
+  background-color: #ff4d4f;
+  border-radius: 2px;
+}
+
+.error-icon::before {
+  transform: rotate(45deg);
+}
+
+.error-icon::after {
+  transform: rotate(-45deg);
+}
+
+.error-title {
+  font-size: 18px;
+  color: #333;
+  margin: 0 0 10px;
+}
+
+.error-message {
+  color: #999;
+  margin: 0 0 20px;
+}
+
+.retry-button {
+  background-color: #4a99e9;
+  color: white;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.3s;
+}
+
+.retry-button:hover {
+  background-color: #3a89d9;
+}
+
+/* 添加Toast提示样式 */
+.toast {
+  position: fixed;
+  top: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 10px 20px;
+  border-radius: 4px;
+  z-index: 1000;
+  font-size: 14px;
+  color: white;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+  max-width: 80%;
+}
+
+.toast-success {
+  background-color: #67C23A;
+}
+
+.toast-error {
+  background-color: #F56C6C;
+}
+
+.toast-info {
+  background-color: #409EFF;
+}
+
+.toast-fade-enter-active,
+.toast-fade-leave-active {
+  transition: opacity 0.3s, transform 0.3s;
+}
+
+.toast-fade-enter-from,
+.toast-fade-leave-to {
+  opacity: 0;
+  transform: translateX(-50%) translateY(-20px);
+}
+
+/* 添加旋转动画样式 */
+.spinning {
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
 }
 </style>

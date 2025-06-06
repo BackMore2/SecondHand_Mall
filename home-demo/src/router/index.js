@@ -11,6 +11,7 @@ import OrderCreatePage from '@/views/OrderCreatePage.vue';
 import OrderPayPage from '@/views/OrderPayPage.vue';
 import ProductDetailPage from '@/views/ProductDetailPage.vue';
 import ProductPublishPage from '@/views/ProductPublishPage.vue';
+import ProductPreviewPage from '@/views/ProductPreviewPage.vue';
 
 // 修复变量名称拼写错误
 const routes = [
@@ -26,6 +27,7 @@ const routes = [
     { path: '/order/create', component: OrderCreatePage },
     { path: '/order/pay/:id', component: OrderPayPage },
     { path: '/product/publish', component: ProductPublishPage },
+    { path: '/product/preview', component: ProductPreviewPage },
     { path: '/product/:id', component: ProductDetailPage }
 ];
 

@@ -53,7 +53,31 @@ export const useUserStore = defineStore('user', {
   getters: {
     // 获取用户头像，如无则使用默认头像
     userAvatar: (state) => {
-      return state.currentUser?.avatar || '/avatars/default-avatar.png';
+      if (!state.currentUser?.avatar) {
+        console.log('没有头像，使用默认头像');
+        return '/avatars/default-avatar.png';
+      }
+      
+      // 输出头像路径，用于调试
+      console.log('原始头像路径:', state.currentUser.avatar);
+      
+      // 如果头像路径是完整的 URL，直接返回
+      if (state.currentUser.avatar.startsWith('http')) {
+        console.log('使用完整URL头像');
+        return state.currentUser.avatar;
+      }
+      
+      // 如果是以 /uploads/ 开头的路径，添加服务器基础URL
+      if (state.currentUser.avatar.startsWith('/uploads/')) {
+        const avatarUrl = `http://localhost:8080${state.currentUser.avatar}`;
+        console.log('完整头像URL:', avatarUrl);
+        return avatarUrl;
+      }
+      
+      // 其他情况，可能是相对路径，也添加服务器基础URL
+      const avatarUrl = `http://localhost:8080${state.currentUser.avatar}`;
+      console.log('完整头像URL:', avatarUrl);
+      return avatarUrl;
     },
     // 获取用户全名
     fullName: (state) => {
@@ -205,18 +229,22 @@ export const useUserStore = defineStore('user', {
       try {
         if (!this.currentUser) return { success: false, error: '用户未登录' };
         
-        // 验证旧密码 (模拟)
-        const hashedOldPassword = this.hashPassword(oldPassword);
-        // 实际实现中应验证旧密码是否正确
-        
-        // 设置新密码
-        const hashedNewPassword = this.hashPassword(newPassword);
-        
-        // 模拟API调用 - 实际项目中替换为真实的API调用
-        return { success: true, message: '密码修改成功' };
+        // 调用后端 API
+        const response = await api.post(`/users/${this.currentUser.id}/change-password`, {
+          oldPassword: this.hashPassword(oldPassword),
+          newPassword: this.hashPassword(newPassword)
+        });
+
+        if (response.status === 200) {
+          return { success: true, message: '密码修改成功' };
+        }
+        return { success: false, error: '密码修改失败' };
       } catch (error) {
         console.error('Password change failed:', error);
-        return { success: false, error: '密码修改失败' };
+        return { 
+          success: false, 
+          error: error.response?.data?.error || '密码修改失败'
+        };
       }
     },
     
@@ -225,34 +253,20 @@ export const useUserStore = defineStore('user', {
       try {
         if (!this.currentUser) return { success: false, error: '用户未登录' };
         
-        // 模拟API调用 - 实际项目中替换为真实的API调用
-        this.addresses = [
-          {
-            id: 'addr_1',
-            name: '张三',
-            phone: '13800138000',
-            province: '广东省',
-            city: '深圳市',
-            district: '南山区',
-            address: '科技园路1号',
-            isDefault: true
-          },
-          {
-            id: 'addr_2',
-            name: '李四',
-            phone: '13900139000',
-            province: '北京市',
-            city: '北京市',
-            district: '海淀区',
-            address: '中关村南大街5号',
-            isDefault: false
-          }
-        ];
+        // 调用后端 API
+        const response = await api.get(`/addresses/user/${this.currentUser.id}`);
         
-        return { success: true, addresses: this.addresses };
+        if (response.data) {
+          this.addresses = response.data;
+          return { success: true, addresses: this.addresses };
+        }
+        return { success: false, error: '获取地址列表失败' };
       } catch (error) {
         console.error('Fetch addresses failed:', error);
-        return { success: false, error: '获取地址列表失败' };
+        return { 
+          success: false, 
+          error: error.response?.data?.error || '获取地址列表失败'
+        };
       }
     },
     
@@ -261,26 +275,26 @@ export const useUserStore = defineStore('user', {
       try {
         if (!this.currentUser) return { success: false, error: '用户未登录' };
         
-        // 生成唯一ID
-        const newAddress = {
-          id: 'addr_' + Date.now(),
-          ...addressData
-        };
+        // 调用后端 API
+        const response = await api.post(`/addresses/user/${this.currentUser.id}`, {
+          recipientName: addressData.name,
+          recipientPhone: addressData.phone,
+          address: `${addressData.province} ${addressData.city} ${addressData.district} ${addressData.address}`,
+          isDefault: addressData.isDefault
+        });
         
-        // 如果是默认地址，将其他地址设为非默认
-        if (newAddress.isDefault) {
-          this.addresses.forEach(addr => {
-            addr.isDefault = false;
-          });
+        if (response.data) {
+          // 更新地址列表
+          await this.fetchUserAddresses();
+          return { success: true, address: response.data };
         }
-        
-        // 添加到地址列表
-        this.addresses.push(newAddress);
-        
-        return { success: true, address: newAddress };
+        return { success: false, error: '添加地址失败' };
       } catch (error) {
         console.error('Add address failed:', error);
-        return { success: false, error: '添加地址失败' };
+        return { 
+          success: false, 
+          error: error.response?.data?.error || '添加地址失败'
+        };
       }
     },
     
@@ -289,23 +303,78 @@ export const useUserStore = defineStore('user', {
       try {
         if (!this.currentUser) return { success: false, error: '用户未登录' };
         
-        const index = this.addresses.findIndex(addr => addr.id === addressId);
-        if (index === -1) return { success: false, error: '地址不存在' };
-        
-        // 如果是默认地址，将其他地址设为非默认
-        if (addressData.isDefault) {
-          this.addresses.forEach(addr => {
-            addr.isDefault = false;
-          });
+        // 如果只传了isDefault字段（设置默认地址）
+        if (Object.keys(addressData).length === 1 && 'isDefault' in addressData) {
+          try {
+            const response = await api.put(`/addresses/${addressId}/default`);
+            if (response.data) {
+              // 更新地址列表
+              await this.fetchUserAddresses();
+              return { success: true, address: response.data };
+            }
+            return { success: false, error: '设置默认地址失败' };
+          } catch (error) {
+            console.error('Set default address failed:', error);
+            throw error;
+          }
         }
         
-        // 更新地址
-        this.addresses[index] = { ...this.addresses[index], ...addressData };
+        // 确保token在请求头中
+        const token = localStorage.getItem('token');
+        if (!token) {
+          return { success: false, error: '用户未登录或会话已过期' };
+        }
         
-        return { success: true, address: this.addresses[index] };
+        console.log('更新地址请求数据:', {
+          addressId,
+          recipientName: addressData.name,
+          recipientPhone: addressData.phone,
+          address: `${addressData.province} ${addressData.city} ${addressData.district} ${addressData.address}`,
+          isDefault: addressData.isDefault,
+          user: { id: this.currentUser.id }
+        });
+        
+        // 调用后端 API
+        try {
+          const response = await api.put(`/addresses/${addressId}`, {
+            recipientName: addressData.name,
+            recipientPhone: addressData.phone,
+            address: `${addressData.province} ${addressData.city} ${addressData.district} ${addressData.address}`,
+            isDefault: addressData.isDefault,
+            user: { id: this.currentUser.id } // 添加用户信息
+          });
+          
+          console.log('更新地址响应:', response);
+          
+          if (response.data) {
+            // 更新地址列表
+            await this.fetchUserAddresses();
+            return { success: true, address: response.data };
+          }
+          return { success: false, error: '更新地址失败' };
+        } catch (error) {
+          console.error('Update address API call failed:', error);
+          
+          // 即使API调用失败，我们也刷新一下地址列表，因为数据库可能已经更新了
+          try {
+            await this.fetchUserAddresses();
+          } catch (fetchError) {
+            console.error('Failed to refresh addresses after update:', fetchError);
+          }
+          
+          throw error;
+        }
       } catch (error) {
         console.error('Update address failed:', error);
-        return { success: false, error: '更新地址失败' };
+        // 详细记录错误信息，便于调试
+        if (error.response) {
+          console.error('Error status:', error.response.status);
+          console.error('Error data:', error.response.data);
+        }
+        return { 
+          success: false, 
+          error: error.response?.data?.error || '更新地址失败'
+        };
       }
     },
     
@@ -314,21 +383,21 @@ export const useUserStore = defineStore('user', {
       try {
         if (!this.currentUser) return { success: false, error: '用户未登录' };
         
-        const index = this.addresses.findIndex(addr => addr.id === addressId);
-        if (index === -1) return { success: false, error: '地址不存在' };
+        // 调用后端 API
+        const response = await api.delete(`/addresses/${addressId}`);
         
-        // 删除地址
-        this.addresses.splice(index, 1);
-        
-        // 如果删除的是默认地址且还有其他地址，将第一个地址设为默认
-        if (this.addresses.length > 0 && !this.addresses.some(addr => addr.isDefault)) {
-          this.addresses[0].isDefault = true;
+        if (response.status === 200) {
+          // 更新地址列表
+          await this.fetchUserAddresses();
+          return { success: true };
         }
-        
-        return { success: true };
+        return { success: false, error: '删除地址失败' };
       } catch (error) {
         console.error('Delete address failed:', error);
-        return { success: false, error: '删除地址失败' };
+        return { 
+          success: false, 
+          error: error.response?.data?.error || '删除地址失败'
+        };
       }
     },
     

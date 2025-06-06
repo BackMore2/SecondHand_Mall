@@ -3,7 +3,15 @@
     <!-- 使用共用导航组件 -->
     <NavBar />
     
-    <div class="container" v-if="product">
+    <!-- 加载中 -->
+    <div class="container loading-container" v-if="loading">
+      <div class="loading-spinner">
+        <i class="fas fa-spinner fa-spin"></i>
+        <p>正在加载商品详情...</p>
+      </div>
+    </div>
+    
+    <div class="container" v-else-if="product">
       <div class="back-link">
         <router-link to="/">
           <i class="fas fa-arrow-left"></i> 返回首页
@@ -152,12 +160,45 @@
           
           <!-- 用户评价 -->
           <div v-if="activeTab === 'reviews'" class="product-reviews">
-            <div v-if="reviews.length > 0">
+            <!-- 加载中 -->
+            <div v-if="reviewsLoading" class="reviews-loading">
+              <i class="fas fa-spinner fa-spin"></i>
+              <p>正在加载评价数据...</p>
+            </div>
+            
+            <!-- 错误信息 -->
+            <div v-else-if="reviewsError" class="reviews-error">
+              <i class="fas fa-exclamation-circle"></i>
+              <p>{{ reviewsError }}</p>
+              <button class="retry-btn" @click="fetchReviews">重新加载</button>
+            </div>
+            
+            <!-- 评价列表 -->
+            <div v-else-if="reviews.length > 0" class="reviews-list">
+              <div class="review-summary">
+                <div class="review-count">
+                  <span class="count-number">{{ reviews.length }}</span>
+                  <span class="count-text">条评价</span>
+                </div>
+                <div class="review-stats">
+                  <div class="stats-rating">
+                    <span class="rating-average">{{ averageRating }}</span>
+                    <div class="stars">
+                      <i 
+                        v-for="i in 5" 
+                        :key="i" 
+                        :class="['fas', i <= Math.round(averageRating) ? 'fa-star' : 'fa-star-o']"
+                      ></i>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              
               <div class="review-item" v-for="(review, index) in reviews" :key="index">
                 <div class="review-header">
                   <div class="reviewer-info">
                     <div class="reviewer-avatar"></div>
-                    <div class="reviewer-name">{{ review.username }}</div>
+                    <div class="reviewer-name">{{ review.username || '匿名用户' }}</div>
                   </div>
                   <div class="review-rating">
                     <div class="stars">
@@ -188,6 +229,8 @@
                 </div>
               </div>
             </div>
+            
+            <!-- 暂无评价 -->
             <div v-else class="no-reviews">
               <i class="fas fa-comment-slash"></i>
               <p>暂无评价</p>
@@ -223,7 +266,7 @@
     <div v-else class="container not-found">
       <div class="not-found-content">
         <i class="fas fa-exclamation-circle"></i>
-        <h2>商品不存在或已下架</h2>
+        <h2>{{ error || '商品不存在或已下架' }}</h2>
         <router-link to="/" class="go-home-btn">返回首页</router-link>
       </div>
     </div>
@@ -234,11 +277,15 @@
 import { ref, computed, onMounted } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useCartStore } from '@/stores/cart';
+import { useProductStore } from '@/stores/product';
 import NavBar from '@/components/NavBar.vue';
+import * as productApi from '@/api/product';
+import * as reviewApi from '@/api/review';
 
 const route = useRoute();
 const router = useRouter();
 const cartStore = useCartStore();
+const productStore = useProductStore();
 
 // 商品ID
 const productId = parseInt(route.params.id);
@@ -248,79 +295,180 @@ const product = ref(null);
 const currentImageIndex = ref(0);
 const quantity = ref(1);
 const activeTab = ref('details');
+const loading = ref(false);
+const error = ref(null);
+const reviews = ref([]);
+const reviewsLoading = ref(false);
+const reviewsError = ref(null);
 
 // 获取商品数据
-onMounted(() => {
-  const foundProduct = cartStore.products.find(p => p.id === productId);
+onMounted(async () => {
+  loading.value = true;
+  error.value = null;
   
-  if (foundProduct) {
-    // 为商品添加额外信息
-    product.value = {
-      ...foundProduct,
-      categoryId: foundProduct.categoryId || Math.floor(Math.random() * 5) + 1,
-      publishTime: foundProduct.publishTime || new Date(Date.now() - Math.random() * 90 * 24 * 60 * 60 * 1000).toISOString(),
-      isHot: foundProduct.id === 1 || Math.random() > 0.7,
-      description: foundProduct.description || '这是一个高品质的二手商品，几乎全新，欢迎咨询',
-      seller: foundProduct.seller || `用户${Math.floor(Math.random() * 1000) + 1}`,
-      originalPrice: foundProduct.id === 2 ? foundProduct.price * 1.2 : (Math.random() > 0.5 ? foundProduct.price * 1.3 : null),
-      detailedDescription: '这是一款非常优质的二手商品，使用时间不长，功能完好，外观几乎全新。由于个人原因出售，价格优惠，欢迎有需要的同学联系购买。',
-      condition: Math.random() > 0.5 ? '9成新' : '95成新',
-      brand: ['Apple', 'Samsung', 'Huawei', 'Xiaomi', 'Sony'][Math.floor(Math.random() * 5)],
-      usedDuration: ['3个月', '6个月', '1年', '1年半'][Math.floor(Math.random() * 4)],
-      purchaseDate: new Date(Date.now() - Math.random() * 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-    };
+  try {
+    // 先尝试从API获取商品详情
+    const productData = await productApi.getProductById(productId);
+    
+    if (productData) {
+      // 使用规范化函数处理获取的产品数据
+      product.value = productStore.normalizeProduct(productData);
+      
+      // 增加商品浏览量
+      productStore.incrementProductViews(productId);
+      
+      console.log('从API获取的商品详情:', product.value);
+      
+      // 获取商品评价
+      fetchReviews();
+    } else {
+      // 如果API没有返回数据，尝试从本地store获取
+      const foundProduct = productStore.getProductById(productId) || 
+                         cartStore.products.find(p => p.id === productId);
+      
+      if (foundProduct) {
+        // 为商品添加额外信息
+        product.value = {
+          ...foundProduct,
+          categoryId: foundProduct.categoryId || Math.floor(Math.random() * 5) + 1,
+          publishTime: foundProduct.publishTime || new Date(Date.now() - Math.random() * 90 * 24 * 60 * 60 * 1000).toISOString(),
+          isHot: foundProduct.id === 1 || Math.random() > 0.7,
+          description: foundProduct.description || '这是一个高品质的二手商品，几乎全新，欢迎咨询',
+          seller: foundProduct.seller || `用户${Math.floor(Math.random() * 1000) + 1}`,
+          originalPrice: foundProduct.id === 2 ? foundProduct.price * 1.2 : (Math.random() > 0.5 ? foundProduct.price * 1.3 : null),
+          detailedDescription: '这是一款非常优质的二手商品，使用时间不长，功能完好，外观几乎全新。由于个人原因出售，价格优惠，欢迎有需要的同学联系购买。',
+          condition: Math.random() > 0.5 ? '9成新' : '95成新',
+          brand: ['Apple', 'Samsung', 'Huawei', 'Xiaomi', 'Sony'][Math.floor(Math.random() * 5)],
+          usedDuration: ['3个月', '6个月', '1年', '1年半'][Math.floor(Math.random() * 4)],
+          purchaseDate: new Date(Date.now() - Math.random() * 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+        };
+        
+        // 获取模拟评价数据
+        reviews.value = getMockReviews();
+      } else {
+        error.value = '商品不存在或已下架';
+      }
+    }
+  } catch (err) {
+    console.error('获取商品详情失败:', err);
+    error.value = '获取商品详情失败';
+    
+    // 尝试从本地获取数据作为备选
+    const foundProduct = productStore.getProductById(productId) || 
+                       cartStore.products.find(p => p.id === productId);
+    
+    if (foundProduct) {
+      product.value = {
+        ...foundProduct,
+        categoryId: foundProduct.categoryId || Math.floor(Math.random() * 5) + 1,
+        publishTime: foundProduct.publishTime || new Date(Date.now() - Math.random() * 90 * 24 * 60 * 60 * 1000).toISOString(),
+        isHot: foundProduct.id === 1 || Math.random() > 0.7,
+        description: foundProduct.description || '这是一个高品质的二手商品，几乎全新，欢迎咨询',
+        seller: foundProduct.seller || `用户${Math.floor(Math.random() * 1000) + 1}`,
+        originalPrice: foundProduct.id === 2 ? foundProduct.price * 1.2 : (Math.random() > 0.5 ? foundProduct.price * 1.3 : null),
+        detailedDescription: '这是一款非常优质的二手商品，使用时间不长，功能完好，外观几乎全新。由于个人原因出售，价格优惠，欢迎有需要的同学联系购买。',
+        condition: Math.random() > 0.5 ? '9成新' : '95成新',
+        brand: ['Apple', 'Samsung', 'Huawei', 'Xiaomi', 'Sony'][Math.floor(Math.random() * 5)],
+        usedDuration: ['3个月', '6个月', '1年', '1年半'][Math.floor(Math.random() * 4)],
+        purchaseDate: new Date(Date.now() - Math.random() * 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+      };
+      
+      // 获取模拟评价数据
+      reviews.value = getMockReviews();
+    }
+  } finally {
+    loading.value = false;
   }
 });
 
-// 商品图片 (模拟多张图片)
+// 商品图片 (基于API返回的图片或模拟图片)
 const productImages = computed(() => {
   if (!product.value) return [];
   
-  const baseImage = product.value.image;
+  // 如果有图片数组，使用它
+  if (product.value.images && Array.isArray(product.value.images) && product.value.images.length > 0) {
+    return product.value.images;
+  }
+  
+  // 否则使用主图片
+  const mainImage = product.value.mainImage || product.value.main_image || product.value.image;
+  if (!mainImage) return [];
+  
   // 生成不同颜色的图片作为演示
   return [
-    baseImage,
-    baseImage.replace('ccc', 'eee'),
-    baseImage.replace('ccc', 'ddd'),
-    baseImage.replace('ccc', 'aaa')
+    mainImage,
+    mainImage.replace('ccc', 'eee'),
+    mainImage.replace('ccc', 'ddd'),
+    mainImage.replace('ccc', 'aaa')
   ];
 });
 
-// 模拟评价数据
-const reviews = [
-  {
-    username: '用户101',
-    rating: 5,
-    date: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000),
-    content: '非常满意的一次购买，物品和描述一致，卖家很热情，发货也很快。',
-    images: [
-      'https://dummyimage.com/100x100/ccc/333',
-      'https://dummyimage.com/100x100/eee/333'
-    ]
-  },
-  {
-    username: '用户239',
-    rating: 4,
-    date: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000),
-    content: '商品质量不错，就是发货稍微有点慢，总体还是比较满意的。'
-  },
-  {
-    username: '用户587',
-    rating: 5,
-    date: new Date(Date.now() - 15 * 24 * 60 * 60 * 1000),
-    content: '价格很实惠，比我想象中的要好，很划算！',
-    images: [
-      'https://dummyimage.com/100x100/ddd/333'
-    ]
+// 获取商品评价
+const fetchReviews = async () => {
+  if (!productId) return;
+  
+  reviewsLoading.value = true;
+  reviewsError.value = null;
+  
+  try {
+    // 从API获取评价数据
+    const reviewsData = await reviewApi.getProductReviews(productId);
+    
+    if (Array.isArray(reviewsData) && reviewsData.length > 0) {
+      // 对评价数据进行处理
+      reviews.value = reviewsData.map(review => reviewApi.normalizeReview(review));
+      console.log('获取到的评价数据:', reviews.value);
+    } else {
+      // 如果没有评价数据，使用模拟数据
+      reviews.value = getMockReviews();
+    }
+  } catch (err) {
+    console.error('获取评价失败:', err);
+    reviewsError.value = '获取评价数据失败';
+    // 使用模拟数据作为备选
+    reviews.value = getMockReviews();
+  } finally {
+    reviewsLoading.value = false;
   }
-];
+};
+
+// 获取模拟评价数据 (作为备选)
+const getMockReviews = () => {
+  return [
+    {
+      username: '用户101',
+      rating: 5,
+      date: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000),
+      content: '非常满意的一次购买，物品和描述一致，卖家很热情，发货也很快。',
+      images: [
+        'https://dummyimage.com/100x100/ccc/333',
+        'https://dummyimage.com/100x100/eee/333'
+      ]
+    },
+    {
+      username: '用户239',
+      rating: 4,
+      date: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000),
+      content: '商品质量不错，就是发货稍微有点慢，总体还是比较满意的。'
+    },
+    {
+      username: '用户587',
+      rating: 5,
+      date: new Date(Date.now() - 15 * 24 * 60 * 60 * 1000),
+      content: '价格很实惠，比我想象中的要好，很划算！',
+      images: [
+        'https://dummyimage.com/100x100/ddd/333'
+      ]
+    }
+  ];
+};
 
 // 相关商品推荐
 const relatedProducts = computed(() => {
   if (!product.value || !product.value.categoryId) return [];
   
-  // 过滤掉当前商品，并获取同类别的其他商品
-  return cartStore.products
+  // 从productStore获取同类别的其他商品
+  return productStore.products
     .filter(p => p.id !== product.value.id && p.categoryId === product.value.categoryId)
     .slice(0, 4); // 最多显示4个相关商品
 });
@@ -382,15 +530,37 @@ function decrementQuantity() {
 }
 
 // 添加到购物车
-function addToCart() {
+async function addToCart() {
   if (!product.value || product.value.stock <= 0) return;
   
-  // 根据选择的数量多次调用添加购物车方法
-  for (let i = 0; i < quantity.value; i++) {
-    cartStore.addToCart(product.value.id);
+  try {
+    // 显示加载状态
+    const btnElement = document.querySelector('.add-to-cart-btn');
+    const originalText = btnElement ? btnElement.innerHTML : '';
+    
+    if (btnElement) {
+      btnElement.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 正在添加...';
+      btnElement.disabled = true;
+    }
+    
+    // 直接使用数量参数一次性添加
+    await cartStore.addToCart(product.value.id, quantity.value);
+    
+    // 成功提示
+    alert(`已将 ${quantity.value} 个 ${product.value.name} 添加到购物车！`);
+  } catch (error) {
+    console.error('添加商品到购物车失败:', error);
+    alert('添加失败，请稍后重试');
+  } finally {
+    // 恢复按钮状态
+    const btnElement = document.querySelector('.add-to-cart-btn');
+    if (btnElement) {
+      setTimeout(() => {
+        btnElement.innerHTML = '<i class="fas fa-shopping-cart"></i> 加入购物车';
+        btnElement.disabled = false;
+      }, 500);
+    }
   }
-  
-  alert(`已将 ${quantity.value} 个 ${product.value.name} 添加到购物车！`);
 }
 
 // 立即购买
@@ -421,12 +591,46 @@ function previewImage(image) {
 function viewProduct(id) {
   router.push(`/product/${id}`);
 }
+
+// 计算平均评分
+const averageRating = computed(() => {
+  if (!reviews.value || reviews.value.length === 0) return 0;
+  
+  const sum = reviews.value.reduce((total, review) => total + review.rating, 0);
+  const avg = sum / reviews.value.length;
+  
+  // 保留一位小数
+  return Math.round(avg * 10) / 10;
+});
 </script>
 
 <style scoped>
 /* 商品详情页整体样式 */
 .product-detail-page {
   min-height: 100vh;
+}
+
+/* 加载状态样式 */
+.loading-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 400px;
+}
+
+.loading-spinner {
+  text-align: center;
+}
+
+.loading-spinner i {
+  font-size: 3rem;
+  color: #409EFF;
+  margin-bottom: 1rem;
+}
+
+.loading-spinner p {
+  font-size: 1.2rem;
+  color: #606266;
 }
 
 /* 内容容器样式 */
@@ -811,18 +1015,100 @@ function viewProduct(id) {
   line-height: 1.8;
 }
 
-/* 评价区域 */
+/* 用户评价样式 */
 .product-reviews {
+  min-height: 300px;
+}
+
+.reviews-loading, 
+.reviews-error, 
+.no-reviews {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px;
+  text-align: center;
+}
+
+.reviews-loading i,
+.reviews-error i,
+.no-reviews i {
+  font-size: 3rem;
+  margin-bottom: 1rem;
+}
+
+.reviews-loading i {
+  color: #409EFF;
+}
+
+.reviews-error i {
+  color: #F56C6C;
+}
+
+.reviews-error .retry-btn {
+  margin-top: 15px;
+  padding: 8px 15px;
+  background-color: #409EFF;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background-color 0.3s;
+}
+
+.reviews-error .retry-btn:hover {
+  background-color: #66b1ff;
+}
+
+.review-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20px;
+  background-color: #f8f9fa;
+  border-radius: 8px;
+  margin-bottom: 20px;
+}
+
+.review-count {
+  display: flex;
+  align-items: baseline;
+}
+
+.count-number {
+  font-size: 2rem;
+  font-weight: bold;
+  color: #303133;
+  margin-right: 5px;
+}
+
+.count-text {
   color: #606266;
 }
 
-.review-item {
-  border-bottom: 1px solid #ebeef5;
-  padding: 20px 0;
+.stats-rating {
+  display: flex;
+  align-items: center;
 }
 
-.review-item:last-child {
-  border-bottom: none;
+.rating-average {
+  font-size: 1.5rem;
+  font-weight: bold;
+  color: #ff9800;
+  margin-right: 10px;
+}
+
+.stars {
+  color: #ff9800;
+}
+
+.review-item {
+  background-color: #fff;
+  border-radius: 8px;
+  padding: 20px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  margin-bottom: 15px;
 }
 
 .review-header {
@@ -837,15 +1123,16 @@ function viewProduct(id) {
 }
 
 .reviewer-avatar {
-  width: 36px;
-  height: 36px;
+  width: 40px;
+  height: 40px;
   border-radius: 50%;
-  background-color: #f0f2f5;
+  background-color: #eee;
   margin-right: 10px;
 }
 
 .reviewer-name {
   font-weight: 500;
+  color: #303133;
 }
 
 .review-rating {
@@ -854,19 +1141,16 @@ function viewProduct(id) {
   align-items: flex-end;
 }
 
-.stars {
-  color: #f7ba2a;
-  margin-bottom: 5px;
-}
-
 .review-date {
-  font-size: 12px;
+  font-size: 0.8rem;
   color: #909399;
+  margin-top: 5px;
 }
 
 .review-content {
-  line-height: 1.6;
+  color: #303133;
   margin-bottom: 15px;
+  line-height: 1.6;
 }
 
 .review-images {
@@ -876,11 +1160,16 @@ function viewProduct(id) {
 }
 
 .review-image {
-  width: 70px;
-  height: 70px;
+  width: 80px;
+  height: 80px;
   border-radius: 4px;
   overflow: hidden;
   cursor: pointer;
+  transition: transform 0.3s;
+}
+
+.review-image:hover {
+  transform: scale(1.05);
 }
 
 .review-image img {
@@ -975,22 +1264,32 @@ function viewProduct(id) {
 
 .not-found-content {
   text-align: center;
-  color: #909399;
 }
 
 .not-found-content i {
-  font-size: 48px;
-  margin-bottom: 15px;
+  font-size: 4rem;
+  color: #f56c6c;
+  margin-bottom: 1rem;
+}
+
+.not-found-content h2 {
+  font-size: 1.5rem;
+  color: #606266;
+  margin-bottom: 1.5rem;
 }
 
 .go-home-btn {
   display: inline-block;
-  margin-top: 20px;
-  padding: 10px 20px;
+  padding: 0.75rem 1.5rem;
   background-color: #409EFF;
   color: white;
-  border-radius: 4px;
   text-decoration: none;
+  border-radius: 4px;
+  transition: background-color 0.3s;
+}
+
+.go-home-btn:hover {
+  background-color: #66b1ff;
 }
 
 /* 响应式样式 */

@@ -23,6 +23,15 @@
                   @change="handleAvatarChange"
                 />
               </div>
+              <div v-if="isUploadingAvatar" class="avatar-uploading">
+                <i class="fas fa-spinner fa-spin"></i>
+              </div>
+            </div>
+            <div v-if="avatarUploadError" class="error-message avatar-error">
+              <i class="fas fa-times-circle"></i> {{ avatarUploadError }}
+            </div>
+            <div v-if="avatarUploadSuccess" class="success-message avatar-success">
+              <i class="fas fa-check-circle"></i> 头像上传成功
             </div>
             <div class="user-name">{{ userName }}</div>
           </div>
@@ -130,12 +139,12 @@
                 <div v-for="address in userStore.addresses" :key="address.id" class="address-card">
                   <div class="address-info">
                     <div class="address-header">
-                      <span class="recipient">{{ address.name }}</span>
-                      <span class="phone">{{ address.phone }}</span>
+                      <span class="recipient">{{ address.recipientName }}</span>
+                      <span class="phone">{{ address.recipientPhone }}</span>
                       <span v-if="address.isDefault" class="default-tag">默认</span>
                     </div>
                     <div class="address-detail">
-                      {{ address.province }} {{ address.city }} {{ address.district }} {{ address.address }}
+                      {{ address.address }}
                     </div>
                   </div>
                   <div class="address-actions">
@@ -317,10 +326,8 @@ const isProcessingAddress = ref(false)
 onMounted(() => {
   if (!userStore.isLoggedIn) {
     router.push('/login')
-  } else {
-    // 初始化表单数据
-    initProfileForm()
   }
+  // 不需要调用 initProfileForm，因为我们已经使用 watch 监听用户信息变化
 })
 
 // 选项卡管理
@@ -328,7 +335,84 @@ const switchTab = (tab) => {
   activeTab.value = tab
 }
 
-// 个人资料相关
+// 头像上传相关
+const isUploadingAvatar = ref(false)
+const avatarUploadError = ref('')
+const avatarUploadSuccess = ref(false)
+
+// 触发文件选择
+const triggerFileUpload = () => {
+  fileInput.value.click()
+}
+
+// 处理头像上传
+const handleAvatarChange = async (event) => {
+  const file = event.target.files[0]
+  if (!file) return
+  
+  // 验证文件类型
+  if (!file.type.startsWith('image/')) {
+    avatarUploadError.value = '请选择图片文件'
+    return
+  }
+  
+  // 验证文件大小（2MB 以内）
+  if (file.size > 2 * 1024 * 1024) {
+    avatarUploadError.value = '图片大小不能超过 2MB'
+    return
+  }
+  
+  avatarUploadError.value = ''
+  isUploadingAvatar.value = true
+  
+  try {
+    const formData = new FormData()
+    formData.append('file', file)
+    
+    // 调用上传 API
+    const userId = userStore.currentUser.id
+    console.log('上传头像，用户ID:', userId)
+    
+    const response = await fetch(`http://localhost:8080/api/users/${userId}/avatar`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${localStorage.getItem('token')}`
+      },
+      body: formData
+    })
+    
+    console.log('上传头像响应状态:', response.status)
+    const result = await response.json()
+    console.log('上传头像响应数据:', result)
+    
+    if (response.ok) {
+      // 上传成功
+      avatarUploadSuccess.value = true
+      setTimeout(() => {
+        avatarUploadSuccess.value = false
+      }, 3000)
+      
+      // 更新用户信息
+      userStore.currentUser = result.user
+      
+      // 打印头像URL，用于调试
+      console.log('更新后的头像URL:', userStore.userAvatar)
+      console.log('原始头像路径:', result.user.avatar)
+    } else {
+      // 上传失败
+      avatarUploadError.value = result.error || '头像上传失败'
+    }
+  } catch (error) {
+    console.error('Avatar upload error:', error)
+    avatarUploadError.value = '头像上传过程中发生错误'
+  } finally {
+    isUploadingAvatar.value = false
+    // 清空文件输入以便下次选择同一文件时触发change事件
+    event.target.value = ''
+  }
+}
+
+// 初始化表单数据
 const profileForm = ref({
   username: userStore.currentUser?.username || '',
   email: userStore.currentUser?.email || '',
@@ -394,14 +478,42 @@ const addressOperationMsg = ref({
 
 // 编辑地址
 const editAddress = (address) => {
+  console.log('编辑地址:', address);
   editingAddressId.value = address.id
-  addressForm.value = { ...address }
+  
+  // 解析地址字符串，提取省市区信息
+  const addressParts = address.address ? address.address.split(' ') : [];
+  let province = '', city = '', district = '', detailAddress = ''
+  
+  if (addressParts.length >= 3) {
+    province = addressParts[0]
+    city = addressParts[1]
+    district = addressParts[2]
+    detailAddress = addressParts.slice(3).join(' ')
+  } else {
+    // 如果地址格式不符合预期，则整个作为详细地址
+    detailAddress = address.address || ''
+  }
+  
+  addressForm.value = {
+    name: address.recipientName || '',
+    phone: address.recipientPhone || '',
+    province: province,
+    city: city,
+    district: district,
+    address: detailAddress,
+    isDefault: address.isDefault || false
+  }
+  
+  console.log('地址表单数据:', addressForm.value);
   showAddressForm.value = true
 }
 
 // 保存地址
 const saveAddress = async () => {
   isProcessingAddress.value = true
+  console.log('保存地址，ID:', editingAddressId.value);
+  console.log('地址表单数据:', addressForm.value);
   
   try {
     let result
@@ -409,20 +521,60 @@ const saveAddress = async () => {
     if (editingAddressId.value) {
       // 更新现有地址
       result = await userStore.updateAddress(editingAddressId.value, addressForm.value)
+      console.log('更新地址结果:', result);
     } else {
       // 添加新地址
       result = await userStore.addAddress(addressForm.value)
+      console.log('添加地址结果:', result);
     }
     
     if (result.success) {
       showAddressForm.value = false
       showAddressMessage('success', editingAddressId.value ? '地址更新成功' : '地址添加成功')
     } else {
-      showAddressMessage('error', result.error || '操作失败')
+      // 即使API返回错误，也尝试刷新地址列表，因为数据库可能已经更新了
+      try {
+        await userStore.fetchUserAddresses();
+        
+        // 如果错误消息包含"已保存但返回数据时出错"，我们认为操作基本成功
+        if (result.error && result.error.includes('已保存但返回数据时出错')) {
+          showAddressForm.value = false
+          showAddressMessage('success', '地址已保存，但返回数据时出错')
+        } else {
+          showAddressMessage('error', result.error || '操作失败')
+        }
+      } catch (fetchError) {
+        console.error('Failed to refresh addresses:', fetchError);
+        showAddressMessage('error', result.error || '操作失败')
+      }
     }
   } catch (error) {
     console.error('Address operation error:', error)
-    showAddressMessage('error', '操作过程中发生错误')
+    let errorMsg = '操作过程中发生错误';
+    
+    // 即使出现异常，也尝试刷新地址列表
+    try {
+      await userStore.fetchUserAddresses();
+    } catch (fetchError) {
+      console.error('Failed to refresh addresses after error:', fetchError);
+    }
+    
+    if (error.response) {
+      console.error('Error status:', error.response.status);
+      console.error('Error data:', error.response.data);
+      
+      // 检查是否是已知的特殊情况
+      if (error.response.data && error.response.data.message && 
+          error.response.data.message.includes('地址已保存但返回数据时出错')) {
+        showAddressForm.value = false
+        showAddressMessage('success', '地址已保存，但返回数据时出错')
+        isProcessingAddress.value = false
+        return;
+      }
+      
+      errorMsg = error.response.data?.error || errorMsg;
+    }
+    showAddressMessage('error', errorMsg)
   } finally {
     isProcessingAddress.value = false
   }
@@ -568,7 +720,7 @@ const changePassword = async () => {
         confirmPassword: ''
       }
       
-      showPasswordMessage('success', '密码修改成功')
+      showPasswordMessage('success', result.message || '密码修改成功')
     } else {
       showPasswordMessage('error', result.error || '密码修改失败')
     }
@@ -591,42 +743,6 @@ const showPasswordMessage = (type, text) => {
   setTimeout(() => {
     passwordUpdateMsg.value.show = false
   }, 3000)
-}
-
-// 头像上传相关
-const triggerFileUpload = () => {
-  fileInput.value.click()
-}
-
-const handleAvatarChange = async (event) => {
-  const file = event.target.files[0]
-  if (!file) return
-  
-  // 文件类型检查
-  if (!file.type.startsWith('image/')) {
-    alert('请选择图片文件')
-    return
-  }
-  
-  // 文件大小检查（限制为2MB）
-  if (file.size > 2 * 1024 * 1024) {
-    alert('图片大小不能超过2MB')
-    return
-  }
-  
-  try {
-    const result = await userStore.updateAvatar(file)
-    
-    if (!result.success) {
-      alert(result.error || '头像上传失败')
-    }
-  } catch (error) {
-    console.error('Avatar upload error:', error)
-    alert('头像上传过程中发生错误')
-  }
-  
-  // 清空文件输入以便下次选择同一文件时触发change事件
-  event.target.value = ''
 }
 
 // 计算属性
@@ -708,36 +824,59 @@ const logout = () => {
 
 .avatar-container {
   position: relative;
-  width: 110px;
-  height: 110px;
-  margin: 0 auto 20px;
+  width: 120px;
+  height: 120px;
+  margin: 0 auto 15px;
+  border-radius: 50%;
+  overflow: hidden;
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.2);
+  background-color: #f0f0f0;
 }
 
 .user-avatar {
-  width: 110px;
-  height: 110px;
-  border-radius: 50%;
+  width: 100%;
+  height: 100%;
   object-fit: cover;
-  border: 4px solid rgba(255, 255, 255, 0.5);
+  display: block;
 }
 
 .avatar-upload {
   position: absolute;
-  bottom: 5px;
-  right: 5px;
-  width: 32px;
-  height: 32px;
-  background: rgba(0, 0, 0, 0.5);
-  border-radius: 50%;
-  display: flex;
-  justify-content: center;
-  align-items: center;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: rgba(0, 0, 0, 0.6);
+  color: white;
+  padding: 5px 0;
+  text-align: center;
   cursor: pointer;
-  transition: all 0.3s;
+  transition: all 0.3s ease;
+  opacity: 0;
 }
 
-.avatar-upload:hover {
-  background: rgba(0, 0, 0, 0.7);
+.avatar-container:hover .avatar-upload {
+  opacity: 1;
+}
+
+.avatar-uploading {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-size: 24px;
+}
+
+.avatar-error, .avatar-success {
+  text-align: center;
+  margin-bottom: 10px;
+  font-size: 0.85rem;
+  padding: 5px;
 }
 
 .user-name {

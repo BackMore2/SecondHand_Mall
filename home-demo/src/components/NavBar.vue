@@ -303,22 +303,29 @@ onUnmounted(() => {
 }
 
 .user-avatar {
-  width: 32px;
-  height: 32px;
+  width: 40px;
+  height: 40px;
   border-radius: 50%;
-  background-color: #f0f2f5;
+  overflow: hidden;
+  cursor: pointer;
+  background-color: #f0f0f0;
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #909399;
-  cursor: pointer;
+  border: 2px solid rgba(255, 255, 255, 0.5);
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
 }
 
 .avatar-img {
   width: 100%;
   height: 100%;
-  border-radius: 50%;
   object-fit: cover;
+  display: block;
+}
+
+.user-avatar i {
+  font-size: 20px;
+  color: #999;
 }
 
 .user-dropdown-menu {
