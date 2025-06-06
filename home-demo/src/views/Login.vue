@@ -83,10 +83,11 @@
 
 <script setup>
 import { ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRouter, useRoute } from 'vue-router'
 import { useUserStore } from '@/stores/user'
 
 const router = useRouter()
+const route = useRoute()
 const userStore = useUserStore()
 
 const credential = ref('') // 改为 credential，可以是邮箱或手机号
@@ -112,15 +113,23 @@ const handleLogin = async () => {
     })
     
     if (result.success) {
-      // 登录成功，跳转到首页
-      router.push('/')
+      // 输出登录成功信息（调试用）
+      console.log('登录成功，令牌状态:', !!userStore.token)
+      console.log('设置的token:', userStore.token?.substring(0, 10) + '...')
+      
+      // 存储token（确保两个地方都设置）
+      localStorage.setItem('token', userStore.token)
+      
+             // 导航到首页或之前的页面
+       const returnPath = route.query.redirect || '/'
+       router.push(returnPath)
     } else {
       // 登录失败，显示错误信息
       errorMsg.value = result.error || '登录失败，请检查账号和密码'
     }
   } catch (error) {
-    console.error('Login error:', error)
-    errorMsg.value = '登录过程中发生错误，请稍后重试'
+    console.error('登录过程中发生错误:', error)
+    errorMsg.value = '登录失败，请稍后重试'
   } finally {
     isLoading.value = false
   }

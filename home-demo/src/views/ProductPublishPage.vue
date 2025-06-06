@@ -7,6 +7,9 @@
     <!-- 导航栏 -->
     <NavBar />
     
+    <!-- 登录状态检查 -->
+    <LoginStatusChecker />
+    
     <div class="container">
       <div class="section-header">
         <h2 class="section-title">{{ isEditing ? '编辑商品' : '发布二手商品' }}</h2>
@@ -31,206 +34,249 @@
       <div class="content-wrapper">
         <!-- 发布或编辑商品表单 -->
         <div v-if="activeTab === 'publish'" class="publish-form-container">
-          <form @submit.prevent="submitProduct" class="publish-form">
-            <!-- 商品基本信息 -->
-            <div class="form-section">
-              <h3 class="form-section-title">基本信息</h3>
-              
-              <div class="form-row">
-                <div class="form-group">
-                  <label>商品名称 <span class="required">*</span></label>
-                  <input 
-                    type="text" 
-                    v-model="productForm.name" 
-                    required 
-                    placeholder="请输入商品名称"
-                  />
-                </div>
-              </div>
-              
-              <div class="form-row">
-                <div class="form-group">
-                  <label>商品分类 <span class="required">*</span></label>
-                  <select v-model="productForm.categoryId" required>
-                    <option value="" disabled>请选择商品分类</option>
-                    <option 
-                      v-for="category in productStore.getCategoryList" 
-                      :key="category.id" 
-                      :value="category.id"
-                    >
-                      {{ category.name }}
-                    </option>
-                  </select>
-                </div>
+          <div class="publish-layout">
+            <form @submit.prevent="submitProduct" class="publish-form">
+              <!-- 商品基本信息 -->
+              <div class="form-section">
+                <h3 class="form-section-title">基本信息</h3>
                 
-                <div class="form-group">
-                  <label>商品价格 <span class="required">*</span></label>
-                  <div class="price-input">
-                    <span class="currency">¥</span>
+                <div class="form-row">
+                  <div class="form-group">
+                    <label>商品名称 <span class="required">*</span></label>
                     <input 
-                      type="number" 
-                      v-model="productForm.price" 
-                      step="0.01" 
-                      min="0" 
+                      type="text" 
+                      v-model="productForm.name" 
                       required 
-                      placeholder="0.00"
+                      placeholder="请输入商品名称"
                     />
                   </div>
                 </div>
-              </div>
-              
-              <div class="form-row">
-                <div class="form-group">
-                  <label>原价</label>
-                  <div class="price-input">
-                    <span class="currency">¥</span>
+                
+                <div class="form-row">
+                  <div class="form-group">
+                    <label>商品分类 <span class="required">*</span></label>
+                    <select v-model="productForm.categoryId" required>
+                      <option value="" disabled>请选择商品分类</option>
+                      <option 
+                        v-for="category in productStore.getCategoryList" 
+                        :key="category.id" 
+                        :value="category.id"
+                      >
+                        {{ category.name }}
+                      </option>
+                    </select>
+                  </div>
+                  
+                  <div class="form-group">
+                    <label>商品价格 <span class="required">*</span></label>
+                    <div class="price-input">
+                      <span class="currency">¥</span>
+                      <input 
+                        type="number" 
+                        v-model="productForm.price" 
+                        step="0.01" 
+                        min="0" 
+                        required 
+                        placeholder="0.00"
+                      />
+                    </div>
+                  </div>
+                </div>
+                
+                <div class="form-row">
+                  <div class="form-group">
+                    <label>原价</label>
+                    <div class="price-input">
+                      <span class="currency">¥</span>
+                      <input 
+                        type="number" 
+                        v-model="productForm.originalPrice" 
+                        step="0.01" 
+                        min="0" 
+                        placeholder="0.00"
+                      />
+                    </div>
+                  </div>
+                  
+                  <div class="form-group">
+                    <label>库存数量 <span class="required">*</span></label>
                     <input 
                       type="number" 
-                      v-model="productForm.originalPrice" 
-                      step="0.01" 
-                      min="0" 
-                      placeholder="0.00"
+                      v-model="productForm.stock" 
+                      min="1" 
+                      required 
+                      placeholder="1"
                     />
                   </div>
                 </div>
-                
-                <div class="form-group">
-                  <label>库存数量 <span class="required">*</span></label>
-                  <input 
-                    type="number" 
-                    v-model="productForm.stock" 
-                    min="1" 
-                    required 
-                    placeholder="1"
-                  />
-                </div>
               </div>
-            </div>
-            
-            <!-- 商品图片 -->
-            <div class="form-section">
-              <h3 class="form-section-title">商品图片</h3>
-              <p class="form-section-desc">添加商品图片，第一张图片将作为主图（最多上传5张图片）</p>
               
-              <div class="image-uploader">
-                <div 
-                  v-for="(image, index) in productForm.images" 
-                  :key="index" 
-                  class="image-item"
-                >
-                  <img :src="image" :alt="`商品图片${index + 1}`" />
-                  <div class="image-item-actions">
-                    <button type="button" class="btn-image-delete" @click="removeImage(index)">
-                      <i class="fas fa-trash"></i>
-                    </button>
+              <!-- 商品图片 -->
+              <div class="form-section">
+                <h3 class="form-section-title">商品图片</h3>
+                <p class="form-section-desc">添加商品图片，第一张图片将作为主图（最多上传5张图片）</p>
+                
+                <div class="image-uploader">
+                  <div 
+                    v-for="(image, index) in productForm.images" 
+                    :key="index" 
+                    class="image-item"
+                  >
+                    <img :src="image" :alt="`商品图片${index + 1}`" />
+                    <div class="image-item-actions">
+                      <button type="button" class="btn-image-view" @click="previewImage(image)">
+                        <i class="fas fa-eye"></i>
+                      </button>
+                      <button type="button" class="btn-image-delete" @click="removeImage(index)">
+                        <i class="fas fa-trash"></i>
+                      </button>
+                    </div>
+                    <div class="image-item-badge" v-if="index === 0">主图</div>
                   </div>
-                </div>
-                
-                <div 
-                  v-if="productForm.images.length < 5" 
-                  class="image-upload-trigger"
-                  @click="triggerImageUpload"
-                >
-                  <input 
-                    type="file" 
-                    ref="imageInput" 
-                    accept="image/*" 
-                    style="display: none;" 
-                    @change="handleImageUpload" 
-                  />
-                  <i class="fas fa-plus"></i>
-                  <span>添加图片</span>
-                </div>
-              </div>
-            </div>
-            
-            <!-- 商品描述 -->
-            <div class="form-section">
-              <h3 class="form-section-title">商品详情</h3>
-              
-              <div class="form-row">
-                <div class="form-group full-width">
-                  <label>商品描述 <span class="required">*</span></label>
-                  <textarea 
-                    v-model="productForm.description" 
-                    rows="5" 
-                    required 
-                    placeholder="请详细描述商品的情况，如新旧程度、使用感受等"
-                  ></textarea>
-                </div>
-              </div>
-              
-              <div class="form-row">
-                <div class="form-group">
-                  <label>成色</label>
-                  <select v-model="productForm.condition">
-                    <option value="全新">全新</option>
-                    <option value="9成新">9成新</option>
-                    <option value="8成新">8成新</option>
-                    <option value="7成新">7成新</option>
-                    <option value="6成新及以下">6成新及以下</option>
-                  </select>
-                </div>
-                
-                <div class="form-group">
-                  <label>使用时长</label>
-                  <input type="text" v-model="productForm.usedDuration" placeholder="如: 3个月" />
-                </div>
-              </div>
-              
-              <div class="form-row">
-                <div class="form-group">
-                  <label>品牌</label>
-                  <input type="text" v-model="productForm.brand" placeholder="商品的品牌" />
-                </div>
-                
-                <div class="form-group">
-                  <label>购买日期</label>
-                  <input type="date" v-model="productForm.purchaseDate" />
-                </div>
-              </div>
-            </div>
-            
-            <!-- 发货和交易信息 -->
-            <div class="form-section">
-              <h3 class="form-section-title">交易信息</h3>
-              
-              <div class="form-row">
-                <div class="form-group">
-                  <label>交易方式</label>
-                  <div class="checkbox-group">
-                    <label class="checkbox-label">
-                      <input type="checkbox" v-model="productForm.supportMethods.faceToFace" />
-                      <span>线下面交</span>
-                    </label>
-                    <label class="checkbox-label">
-                      <input type="checkbox" v-model="productForm.supportMethods.delivery" />
-                      <span>快递发货</span>
-                    </label>
+                  
+                  <div 
+                    v-if="productForm.images.length < 5" 
+                    class="image-upload-trigger"
+                    @click="triggerImageUpload"
+                  >
+                    <input 
+                      type="file" 
+                      ref="imageInput" 
+                      accept="image/*" 
+                      style="display: none;" 
+                      @change="handleImageUpload" 
+                    />
+                    <i class="fas fa-plus"></i>
+                    <span>添加图片</span>
                   </div>
                 </div>
               </div>
               
-              <div class="form-row" v-if="productForm.supportMethods.faceToFace">
-                <div class="form-group full-width">
-                  <label>可面交地点</label>
-                  <input 
-                    type="text" 
-                    v-model="productForm.faceToFaceLocation" 
-                    placeholder="如: 大学生活区、图书馆、学校南门等" 
+              <!-- 商品描述 -->
+              <div class="form-section">
+                <h3 class="form-section-title">商品详情</h3>
+                
+                <div class="form-row">
+                  <div class="form-group full-width">
+                    <label>商品描述 <span class="required">*</span></label>
+                    <textarea 
+                      v-model="productForm.description" 
+                      rows="5" 
+                      required 
+                      placeholder="请详细描述商品的情况，如新旧程度、使用感受等"
+                    ></textarea>
+                  </div>
+                </div>
+                
+                <div class="form-row">
+                  <div class="form-group">
+                    <label>成色</label>
+                    <select v-model="productForm.condition">
+                      <option value="全新">全新</option>
+                      <option value="9成新">9成新</option>
+                      <option value="8成新">8成新</option>
+                      <option value="7成新">7成新</option>
+                      <option value="6成新及以下">6成新及以下</option>
+                    </select>
+                  </div>
+                  
+                  <div class="form-group">
+                    <label>使用时长</label>
+                    <input type="text" v-model="productForm.usedDuration" placeholder="如: 3个月" />
+                  </div>
+                </div>
+                
+                <div class="form-row">
+                  <div class="form-group">
+                    <label>品牌</label>
+                    <input type="text" v-model="productForm.brand" placeholder="商品的品牌" />
+                  </div>
+                  
+                  <div class="form-group">
+                    <label>购买日期</label>
+                    <input type="date" v-model="productForm.purchaseDate" />
+                  </div>
+                </div>
+              </div>
+              
+              <!-- 发货和交易信息 -->
+              <div class="form-section">
+                <h3 class="form-section-title">交易信息</h3>
+                
+                <div class="form-row">
+                  <div class="form-group">
+                    <label>交易方式</label>
+                    <div class="checkbox-group">
+                      <label class="checkbox-label">
+                        <input type="checkbox" v-model="productForm.supportMethods.faceToFace" />
+                        <span>线下面交</span>
+                      </label>
+                      <label class="checkbox-label">
+                        <input type="checkbox" v-model="productForm.supportMethods.delivery" />
+                        <span>快递发货</span>
+                      </label>
+                    </div>
+                  </div>
+                </div>
+                
+                <div class="form-row" v-if="productForm.supportMethods.faceToFace">
+                  <div class="form-group full-width">
+                    <label>可面交地点</label>
+                    <input 
+                      type="text" 
+                      v-model="productForm.faceToFaceLocation" 
+                      placeholder="如: 大学生活区、图书馆、学校南门等" 
+                    />
+                  </div>
+                </div>
+              </div>
+              
+              <!-- 表单操作按钮 -->
+              <div class="form-actions">
+                <button type="button" class="btn-cancel" @click="cancelEdit">取消</button>
+                <button type="submit" class="btn-submit">
+                  {{ isEditing ? '保存修改' : '发布商品' }}
+                </button>
+              </div>
+            </form>
+            
+            <!-- 商品预览卡片 -->
+            <div class="product-preview-container" v-if="productForm.name || productForm.images.length > 0">
+              <h3 class="preview-title">商品预览</h3>
+              <div class="product-preview-card">
+                <div class="preview-image">
+                  <img 
+                    :src="productForm.images.length > 0 ? productForm.images[0] : 'https://via.placeholder.com/300x300?text=商品预览'" 
+                    alt="商品预览图"
                   />
+                </div>
+                <div class="preview-content">
+                  <h3 class="preview-name">{{ productForm.name || '商品名称' }}</h3>
+                  <div class="preview-price">¥{{ productForm.price || '0.00' }}</div>
+                  <div class="preview-category" v-if="productForm.categoryId">
+                    分类：{{ getCategoryName(productForm.categoryId) }}
+                  </div>
+                  <div class="preview-condition">
+                    成色：{{ productForm.condition }}
+                  </div>
+                  <div class="preview-description">
+                    {{ truncateDescription(productForm.description || '暂无描述') }}
+                  </div>
+                  <div class="preview-trade-methods">
+                    <span v-if="productForm.supportMethods.delivery" class="trade-badge">
+                      <i class="fas fa-truck"></i> 快递发货
+                    </span>
+                    <span v-if="productForm.supportMethods.faceToFace" class="trade-badge">
+                      <i class="fas fa-handshake"></i> 面交
+                    </span>
+                  </div>
+                  <button type="button" class="btn-preview" @click="openFullPreview">
+                    <i class="fas fa-external-link-alt"></i> 完整预览
+                  </button>
                 </div>
               </div>
             </div>
-            
-            <!-- 表单操作按钮 -->
-            <div class="form-actions">
-              <button type="button" class="btn-cancel" @click="cancelEdit">取消</button>
-              <button type="submit" class="btn-submit">
-                {{ isEditing ? '保存修改' : '发布商品' }}
-              </button>
-            </div>
-          </form>
+          </div>
         </div>
         
         <!-- 我的商品列表 -->
@@ -307,6 +353,16 @@
         </div>
       </div>
     </div>
+    
+    <!-- 图片预览模态框 -->
+    <div class="image-preview-modal" v-if="imagePreview.visible" @click="closeImagePreview">
+      <div class="image-preview-content" @click.stop>
+        <img :src="imagePreview.src" alt="图片预览" />
+        <button class="image-preview-close" @click="closeImagePreview">
+          <i class="fas fa-times"></i>
+        </button>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -316,6 +372,7 @@ import { useRouter } from 'vue-router';
 import { useUserStore } from '@/stores/user';
 import { useProductStore } from '@/stores/product';
 import NavBar from '@/components/NavBar.vue';
+import LoginStatusChecker from '@/components/LoginStatusChecker.vue';
 
 const router = useRouter();
 const userStore = useUserStore();
@@ -327,24 +384,37 @@ const activeTab = ref('publish'); // 'publish' or 'my-products'
 const isEditing = ref(false);
 const editingProductId = ref(null);
 
+// 图片预览状态
+const imagePreview = reactive({
+  visible: false,
+  src: ''
+});
+
 // 商品表单数据
 const productForm = reactive({
   name: '',
   categoryId: '',
+  category_id: '',  // 兼容数据库字段名
   price: '',
   originalPrice: '',
+  original_price: '',  // 兼容数据库字段名
   stock: 1,
   description: '',
   images: [],
   condition: '9成新',
   usedDuration: '',
+  used_duration: '',  // 兼容数据库字段名
   brand: '',
   purchaseDate: '',
+  purchase_date: '',  // 兼容数据库字段名
   supportMethods: {
     faceToFace: true,
     delivery: true
   },
-  faceToFaceLocation: ''
+  face_to_face: 1,  // 兼容数据库字段名
+  delivery: 1,  // 兼容数据库字段名
+  faceToFaceLocation: '',
+  face_to_face_location: ''  // 兼容数据库字段名
 });
 
 // 筛选和搜索
@@ -363,9 +433,12 @@ onMounted(() => {
 });
 
 // 加载用户的商品
-function loadMyProducts() {
-  // 实际应用中，这里可能需要调用API获取数据
-  // 这里使用productStore中的getUserProducts方法
+async function loadMyProducts() {
+  // 调用productStore中的fetchUserProducts方法
+  const result = await productStore.fetchUserProducts();
+  if (!result.success) {
+    alert('加载商品列表失败，请重试');
+  }
 }
 
 // 过滤后的用户商品列表
@@ -426,6 +499,7 @@ function handleImageUpload(event) {
   
   const reader = new FileReader();
   reader.onload = (e) => {
+    // 使用Base64格式直接存储图片
     productForm.images.push(e.target.result);
   };
   reader.readAsDataURL(file);
@@ -444,9 +518,20 @@ async function submitProduct() {
   if (!validateProductForm()) return;
   
   try {
+    // 检查用户是否登录
+    if (!userStore.isLoggedIn || !userStore.token) {
+      alert('您需要先登录才能发布商品');
+      router.push('/login');
+      return;
+    }
+    
+    // 同步相关字段的值
+    syncFormFields();
+    
     const productData = {
       ...productForm,
       sellerId: userStore.currentUser.id,
+      seller_id: userStore.currentUser.id,
       seller: userStore.currentUser.username,
       sellerAvatar: userStore.userAvatar
     };
@@ -473,6 +558,28 @@ async function submitProduct() {
   }
 }
 
+// 同步表单字段（确保驼峰命名和下划线命名的字段保持一致）
+function syncFormFields() {
+  // 分类ID
+  productForm.category_id = productForm.categoryId;
+  
+  // 原价
+  productForm.original_price = productForm.originalPrice;
+  
+  // 使用时长
+  productForm.used_duration = productForm.usedDuration;
+  
+  // 购买日期
+  productForm.purchase_date = productForm.purchaseDate;
+  
+  // 交易方式
+  productForm.face_to_face = productForm.supportMethods.faceToFace ? 1 : 0;
+  productForm.delivery = productForm.supportMethods.delivery ? 1 : 0;
+  
+  // 交易地点
+  productForm.face_to_face_location = productForm.faceToFaceLocation;
+}
+
 // 取消编辑
 function cancelEdit() {
   if (isEditing.value) {
@@ -494,20 +601,27 @@ function resetProductForm() {
   Object.assign(productForm, {
     name: '',
     categoryId: '',
+    category_id: '',
     price: '',
     originalPrice: '',
+    original_price: '',
     stock: 1,
     description: '',
     images: [],
     condition: '9成新',
     usedDuration: '',
+    used_duration: '',
     brand: '',
     purchaseDate: '',
+    purchase_date: '',
     supportMethods: {
       faceToFace: true,
       delivery: true
     },
-    faceToFaceLocation: ''
+    face_to_face: 1,
+    delivery: 1,
+    faceToFaceLocation: '',
+    face_to_face_location: ''
   });
 }
 
@@ -560,21 +674,28 @@ function editProduct(product) {
   // 填充表单数据
   Object.assign(productForm, {
     name: product.name,
-    categoryId: product.categoryId,
+    categoryId: product.categoryId || product.category_id || '',
+    category_id: product.category_id || product.categoryId || '',
     price: product.price,
-    originalPrice: product.originalPrice || '',
+    originalPrice: product.originalPrice || product.original_price || '',
+    original_price: product.original_price || product.originalPrice || '',
     stock: product.stock,
     description: product.description || '',
     images: product.images || [],
     condition: product.condition || '9成新',
-    usedDuration: product.usedDuration || '',
+    usedDuration: product.usedDuration || product.used_duration || '',
+    used_duration: product.used_duration || product.usedDuration || '',
     brand: product.brand || '',
-    purchaseDate: product.purchaseDate || '',
+    purchaseDate: product.purchaseDate || product.purchase_date || '',
+    purchase_date: product.purchase_date || product.purchaseDate || '',
     supportMethods: product.supportMethods || {
-      faceToFace: true,
-      delivery: true
+      faceToFace: !!product.face_to_face,
+      delivery: !!product.delivery
     },
-    faceToFaceLocation: product.faceToFaceLocation || ''
+    face_to_face: product.face_to_face || (product.supportMethods?.faceToFace ? 1 : 0),
+    delivery: product.delivery || (product.supportMethods?.delivery ? 1 : 0),
+    faceToFaceLocation: product.faceToFaceLocation || product.face_to_face_location || '',
+    face_to_face_location: product.face_to_face_location || product.faceToFaceLocation || ''
   });
 }
 
@@ -629,6 +750,61 @@ function formatDate(dateString) {
     month: 'long',
     day: 'numeric'
   });
+}
+
+// 预览图片
+function previewImage(image) {
+  imagePreview.src = image;
+  imagePreview.visible = true;
+}
+
+// 关闭图片预览
+function closeImagePreview() {
+  imagePreview.visible = false;
+}
+
+// 打开完整预览
+function openFullPreview() {
+  // 创建临时商品对象用于预览
+  const previewProduct = {
+    id: 'preview',
+    name: productForm.name || '商品名称预览',
+    price: productForm.price || 0,
+    originalPrice: productForm.originalPrice || 0,
+    description: productForm.description || '暂无描述',
+    images: [...productForm.images],
+    categoryId: productForm.categoryId,
+    condition: productForm.condition,
+    brand: productForm.brand || '',
+    usedDuration: productForm.usedDuration || '',
+    supportMethods: {
+      faceToFace: productForm.supportMethods.faceToFace,
+      delivery: productForm.supportMethods.delivery
+    },
+    faceToFaceLocation: productForm.faceToFaceLocation || '',
+    status: 'online'
+  };
+  
+  // 先清空localStorage中的预览数据，再存储新的预览商品数据
+  localStorage.removeItem('previewProduct');
+  localStorage.setItem('previewProduct', JSON.stringify(previewProduct));
+  
+  // 打开新窗口进行预览
+  window.open('/product/preview', '_blank');
+}
+
+// 获取分类名称
+function getCategoryName(categoryId) {
+  const category = productStore.getCategoryList.find(c => c.id === categoryId);
+  return category ? category.name : '未知分类';
+}
+
+// 截断商品描述
+function truncateDescription(description) {
+  if (description.length > 100) {
+    return description.slice(0, 100) + '...';
+  }
+  return description;
 }
 </script>
 
@@ -926,6 +1102,257 @@ textarea:focus {
 .filter-group select {
   padding: 10px;
   width: 150px;
+}
+
+/* 发布表单布局 */
+.publish-layout {
+  display: flex;
+  gap: 30px;
+}
+
+.publish-form {
+  flex: 1;
+  max-width: 70%;
+}
+
+/* 商品预览 */
+.product-preview-container {
+  width: 30%;
+  min-width: 300px;
+  position: sticky;
+  top: 20px;
+}
+
+.preview-title {
+  font-size: 18px;
+  margin-bottom: 15px;
+  color: #606266;
+  border-bottom: 1px solid #ebeef5;
+  padding-bottom: 10px;
+}
+
+.product-preview-card {
+  background: #fff;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  overflow: hidden;
+}
+
+.preview-image {
+  height: 250px;
+  overflow: hidden;
+}
+
+.preview-image img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.preview-content {
+  padding: 15px;
+}
+
+.preview-name {
+  font-size: 18px;
+  margin: 0 0 10px 0;
+  color: #303133;
+}
+
+.preview-price {
+  font-size: 22px;
+  font-weight: bold;
+  color: #f56c6c;
+  margin-bottom: 15px;
+}
+
+.preview-category,
+.preview-condition {
+  font-size: 14px;
+  color: #606266;
+  margin-bottom: 8px;
+}
+
+.preview-description {
+  font-size: 14px;
+  color: #606266;
+  margin: 15px 0;
+  line-height: 1.5;
+  max-height: 80px;
+  overflow: hidden;
+}
+
+.preview-trade-methods {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 15px;
+}
+
+.trade-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 8px;
+  background: #f0f9eb;
+  color: #67c23a;
+  border-radius: 4px;
+  font-size: 12px;
+}
+
+.trade-badge i {
+  margin-right: 5px;
+}
+
+.btn-preview {
+  width: 100%;
+  padding: 10px;
+  background: #409EFF;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.3s;
+}
+
+.btn-preview:hover {
+  background: #66b1ff;
+}
+
+/* 图片上传改进 */
+.image-uploader {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 15px;
+  margin-top: 10px;
+}
+
+.image-item {
+  width: 120px;
+  height: 120px;
+  border-radius: 4px;
+  overflow: hidden;
+  position: relative;
+  border: 1px solid #ebeef5;
+  transition: all 0.3s;
+}
+
+.image-item:hover {
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.1);
+}
+
+.image-item img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.image-item-actions {
+  position: absolute;
+  top: 0;
+  right: 0;
+  display: flex;
+  opacity: 0;
+  transition: opacity 0.3s;
+}
+
+.image-item:hover .image-item-actions {
+  opacity: 1;
+}
+
+.btn-image-delete,
+.btn-image-view {
+  border: none;
+  background: rgba(0, 0, 0, 0.6);
+  color: #fff;
+  padding: 6px;
+  cursor: pointer;
+  font-size: 12px;
+  transition: all 0.3s;
+}
+
+.btn-image-view {
+  background: rgba(64, 158, 255, 0.6);
+}
+
+.btn-image-view:hover {
+  background: rgba(64, 158, 255, 0.9);
+}
+
+.btn-image-delete:hover {
+  background: rgba(245, 108, 108, 0.9);
+}
+
+.image-item-badge {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: rgba(64, 158, 255, 0.8);
+  color: white;
+  font-size: 12px;
+  text-align: center;
+  padding: 2px 0;
+}
+
+.image-upload-trigger {
+  width: 120px;
+  height: 120px;
+  border: 2px dashed #d9d9d9;
+  border-radius: 4px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  cursor: pointer;
+  color: #8c939d;
+  transition: all 0.3s;
+}
+
+.image-upload-trigger:hover {
+  border-color: #409EFF;
+  color: #409EFF;
+  transform: translateY(-3px);
+}
+
+.image-upload-trigger i {
+  font-size: 28px;
+  margin-bottom: 8px;
+}
+
+/* 图片预览弹窗 */
+.image-preview-modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.8);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 9999;
+}
+
+.image-preview-content {
+  position: relative;
+  max-width: 90%;
+  max-height: 90%;
+}
+
+.image-preview-content img {
+  max-width: 100%;
+  max-height: 90vh;
+  object-fit: contain;
+}
+
+.image-preview-close {
+  position: absolute;
+  top: -30px;
+  right: 0;
+  color: white;
+  background: transparent;
+  border: none;
+  font-size: 24px;
+  cursor: pointer;
 }
 
 /* 商品列表 */
