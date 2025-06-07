@@ -1,4 +1,3 @@
-
 package com.backmore.secondhand_mall.controller;
 
 import com.backmore.secondhand_mall.entity.Cart;
@@ -6,6 +5,9 @@ import com.backmore.secondhand_mall.entity.CartItem;
 import com.backmore.secondhand_mall.service.CartService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
+
+import java.util.HashMap;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/cart")
@@ -25,17 +27,18 @@ public class CartController {
     }
 
     @PostMapping("/add")
-    public Cart addProductToCart(
-            @RequestParam Long userId,
-            @RequestParam Long productId,
-            @RequestParam Integer quantity) {
+    public Cart addProductToCart(@RequestBody Map<String, Object> requestBody) {
+        Long userId = Long.valueOf(requestBody.get("userId").toString());
+        Long productId = Long.valueOf(requestBody.get("productId").toString());
+        Integer quantity = Integer.valueOf(requestBody.get("quantity").toString());
         return cartService.addProductToCart(userId, productId, quantity);
     }
 
     @PutMapping("/item/{cartItemId}")
     public Cart updateCartItemQuantity(
             @PathVariable Long cartItemId,
-            @RequestParam Integer quantity) {
+            @RequestBody Map<String, Object> requestBody) {
+        Integer quantity = Integer.valueOf(requestBody.get("quantity").toString());
         return cartService.updateCartItemQuantity(cartItemId, quantity);
     }
 
@@ -45,7 +48,16 @@ public class CartController {
     }
 
     @DeleteMapping("/clear/{userId}")
-    public void clearCart(@PathVariable Long userId) {
-        cartService.clearCart(userId);
+    public Map<String, Object> clearCart(@PathVariable Long userId) {
+        Map<String, Object> response = new HashMap<>();
+        try {
+            cartService.clearCart(userId);
+            response.put("success", true);
+            response.put("message", "购物车已成功清空");
+        } catch (Exception e) {
+            response.put("success", false);
+            response.put("message", "清空购物车失败: " + e.getMessage());
+        }
+        return response;
     }
 }

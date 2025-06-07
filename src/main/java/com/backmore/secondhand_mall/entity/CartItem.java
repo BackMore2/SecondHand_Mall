@@ -1,6 +1,6 @@
-
 package com.backmore.secondhand_mall.entity;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import lombok.Data;
 import jakarta.persistence.*;
 import java.time.LocalDateTime;
@@ -22,21 +22,36 @@ public class CartItem {
     @Column(name = "quantity", nullable = false)
     private Integer quantity;
 
-    @Column(name = "added_at", updatable = false)
+    @Column(name = "added_time", updatable = false)
     private LocalDateTime createdAt;
 
-    @Column(name = "updated_at")
+    @Column(name = "update_time")
     private LocalDateTime updatedAt;
 
+    @JsonIgnore
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "cart_id", insertable = false, updatable = false)
     private Cart cart;
 
+    // 以下字段不映射到数据库，仅用于传输数据
+    @Transient
+    private String productName;
+    
+    @Transient
+    private Double productPrice;
+    
+    @Transient
+    private String productImage;
+    
+    @Transient
+    private Integer productStock;
+
     public void setUpdateTime(LocalDateTime now) {
+        this.updatedAt = now;
     }
 
     public void setCreateTime(LocalDateTime now) {
-
+        this.createdAt = now;
     }
 
     public Long getId() {
@@ -93,5 +108,37 @@ public class CartItem {
 
     public void setCart(Cart cart) {
         this.cart = cart;
+    }
+    
+    public String getProductName() {
+        return productName;
+    }
+
+    public void setProductName(String productName) {
+        this.productName = productName;
+    }
+
+    public Double getProductPrice() {
+        return productPrice;
+    }
+
+    public void setProductPrice(Double productPrice) {
+        this.productPrice = productPrice;
+    }
+
+    public String getProductImage() {
+        return productImage;
+    }
+
+    public void setProductImage(String productImage) {
+        this.productImage = productImage;
+    }
+
+    public Integer getProductStock() {
+        return productStock;
+    }
+
+    public void setProductStock(Integer productStock) {
+        this.productStock = productStock;
     }
 }

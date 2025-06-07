@@ -3,6 +3,8 @@ package com.backmore.secondhand_mall.entity;
 import jakarta.persistence.*;
 import lombok.Data;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 
 @Entity
 @Table(name = "cart", schema = "secondhand_mall")
@@ -20,6 +22,15 @@ public class Cart {
 
     @Column(name = "update_time")
     private LocalDateTime updateTime;
+
+    @OneToMany(mappedBy = "cart", cascade = CascadeType.ALL, fetch = FetchType.EAGER)
+    private List<CartItem> items = new ArrayList<>();
+
+    @Transient
+    public void addItem(CartItem item) {
+        items.add(item);
+        item.setCart(this);
+    }
 
     public Long getId() {
         return id;
@@ -51,5 +62,13 @@ public class Cart {
 
     public void setUpdateTime(LocalDateTime updateTime) {
         this.updateTime = updateTime;
+    }
+
+    public List<CartItem> getItems() {
+        return items;
+    }
+
+    public void setItems(List<CartItem> items) {
+        this.items = items;
     }
 }

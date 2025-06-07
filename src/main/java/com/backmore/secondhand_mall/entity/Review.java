@@ -1,4 +1,3 @@
-
 package com.backmore.secondhand_mall.entity;
 
 import lombok.Data;
@@ -37,9 +36,9 @@ public class Review {
     @Column(name = "status", length = 20)
     private String status;
 
-    @Column(name = "created_at", updatable = false)
+    @Column(name = "create_time", updatable = false)
     private LocalDateTime createdAt;
 
-    @Column(name = "updated_at")
+    @Column(name = "update_time")
     private LocalDateTime updatedAt;
 }
