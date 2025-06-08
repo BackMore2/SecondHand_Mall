@@ -23,8 +23,10 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.NoSuchElementException;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
@@ -137,18 +139,59 @@ public class ProductController {
             Optional<Product> productOpt = productService.findById(id);
             
             if (!productOpt.isPresent()) {
-                return ResponseEntity.notFound().build();
+                Map<String, String> response = new HashMap<>();
+                response.put("message", "商品不存在: " + id);
+                return ResponseEntity.status(HttpStatus.NOT_FOUND).body(response);
             }
+            
+            Product product = productOpt.get();
             
             // 增加浏览量
             productService.incrementViews(id);
             
-            // 转换为响应对象
-            ProductResponse response = ProductResponse.fromEntity(productOpt.get());
+            // 增加返回卖家信息
+            Map<String, Object> enrichedProduct = new HashMap<>();
+            // 复制产品的所有属性到新的map中
+            enrichedProduct.put("id", product.getId());
+            enrichedProduct.put("name", product.getName());
+            enrichedProduct.put("description", product.getDescription());
+            enrichedProduct.put("price", product.getPrice());
+            enrichedProduct.put("originalPrice", product.getOriginalPrice());
+            enrichedProduct.put("categoryId", product.getCategoryId());
+            enrichedProduct.put("stock", product.getStock());
+            enrichedProduct.put("mainImage", product.getMainImage());
+            enrichedProduct.put("images", product.getImages());
+            enrichedProduct.put("status", product.getStatus());
+            enrichedProduct.put("sellerId", product.getSellerId());
+            enrichedProduct.put("brand", product.getBrand());
+            enrichedProduct.put("condition", product.getCondition());
+            enrichedProduct.put("usedDuration", product.getUsedDuration());
+            enrichedProduct.put("purchaseDate", product.getPurchaseDate());
+            enrichedProduct.put("faceToFace", product.getFaceToFace());
+            enrichedProduct.put("delivery", product.getDelivery());
+            enrichedProduct.put("faceToFaceLocation", product.getFaceToFaceLocation());
+            enrichedProduct.put("createTime", product.getCreateTime());
+            enrichedProduct.put("updateTime", product.getUpdateTime());
             
-            return ResponseEntity.ok(response);
+            // 添加卖家信息
+            try {
+                Optional<User> sellerOpt = userService.findById(product.getSellerId());
+                if (sellerOpt.isPresent()) {
+                    User seller = sellerOpt.get();
+                    enrichedProduct.put("seller", seller.getUsername());
+                    enrichedProduct.put("sellerAvatar", seller.getAvatar());
+                } else {
+                    enrichedProduct.put("seller", "用户" + product.getSellerId());
+                }
+            } catch (Exception e) {
+                enrichedProduct.put("seller", "用户" + product.getSellerId());
+            }
+            
+            return ResponseEntity.ok(enrichedProduct);
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("获取商品详情失败: " + e.getMessage());
+            Map<String, String> response = new HashMap<>();
+            response.put("message", "获取商品详情失败: " + e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
         }
     }
 

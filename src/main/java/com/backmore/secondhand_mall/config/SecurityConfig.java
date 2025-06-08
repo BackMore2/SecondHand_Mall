@@ -67,10 +67,13 @@ public class SecurityConfig {
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers("/api/auth/**").permitAll()
                 .requestMatchers("/api/customerService/**").permitAll()
+                .requestMatchers("/api/customerService/**").permitAll()
                 .requestMatchers("/uploads/**").permitAll()
                 // 允许所有用户访问商品浏览相关接口
                 .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/products").permitAll()  // 允许GET请求查看所有商品
                 .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/products/**").permitAll() // 允许GET请求查看单个商品
+                .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/reviews/product/**").permitAll() // 允许GET请求查看商品评价
+                .requestMatchers("/api/reviews/**").authenticated() // 明确允许通过认证访问评价接口
                 // 订单相关接口需要认证
                 .requestMatchers("/api/orders/**").authenticated()
                 .anyRequest().authenticated()
