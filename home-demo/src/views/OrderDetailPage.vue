@@ -106,7 +106,7 @@
             </div>
             <div class="total-row">
               <span>运费：</span>
-              <span>¥0.00</span>
+              <span>¥10.00</span>
             </div>
             <div class="total-row amount">
               <span>订单总计：</span>

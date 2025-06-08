@@ -126,6 +126,15 @@ export const useProductStore = defineStore('product', {
           normalizedProduct.status = normalizedProduct.status === 1 ? 'online' : 'offline';
         }
         
+        // 确保评分字段存在
+        if (normalizedProduct.averageRating === undefined) {
+          normalizedProduct.averageRating = 0;
+        }
+        
+        if (normalizedProduct.reviewCount === undefined) {
+          normalizedProduct.reviewCount = 0;
+        }
+        
         return normalizedProduct;
       } catch (error) {
         console.error('Error normalizing product:', error);

@@ -7,9 +7,6 @@
     <!-- 导航栏 -->
     <NavBar />
     
-    <!-- 登录状态检查 -->
-    <LoginStatusChecker />
-    
     <div class="container">
       <div class="section-header">
         <h2 class="section-title">{{ isEditing ? '编辑商品' : '发布二手商品' }}</h2>
@@ -372,7 +369,6 @@ import { useRouter } from 'vue-router';
 import { useUserStore } from '@/stores/user';
 import { useProductStore } from '@/stores/product';
 import NavBar from '@/components/NavBar.vue';
-import LoginStatusChecker from '@/components/LoginStatusChecker.vue';
 
 const router = useRouter();
 const userStore = useUserStore();

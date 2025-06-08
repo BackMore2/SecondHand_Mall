@@ -5,11 +5,13 @@
       <div class="shape"></div>
     </div>
     <router-view />
+    <AiCustomerService />
   </div>
 </template>
 
 <script setup>
 // 不再需要手动导入 HomePage 和 CartPage
+import AiCustomerService from '@/components/AiCustomerService.vue';
 </script>
 
 <style>

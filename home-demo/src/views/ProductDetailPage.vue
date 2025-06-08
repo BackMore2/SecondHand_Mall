@@ -71,7 +71,8 @@
             </div>
             <div class="meta-item">
               <span class="meta-label">卖家:</span>
-              <span class="meta-value seller">{{ product.seller }}</span>
+              <span v-if="product.seller" class="meta-value seller">{{ product.seller }}</span>
+              <span v-else class="meta-value seller">{{ sellerName }}</span>
             </div>
             <div class="meta-item">
               <span class="meta-label">发布时间:</span>
@@ -125,7 +126,7 @@
             :class="{ active: activeTab === 'reviews' }"
             @click="activeTab = 'reviews'"
           >
-            用户评价({{ reviews.length }})
+            用户评价({{ productRating.reviewCount }})
           </div>
         </div>
         
@@ -177,7 +178,7 @@
             <div v-else-if="reviews.length > 0" class="reviews-list">
               <div class="review-summary">
                 <div class="review-count">
-                  <span class="count-number">{{ reviews.length }}</span>
+                  <span class="count-number">{{ productRating.reviewCount }}</span>
                   <span class="count-text">条评价</span>
                 </div>
                 <div class="review-stats">
@@ -197,8 +198,12 @@
               <div class="review-item" v-for="(review, index) in reviews" :key="index">
                 <div class="review-header">
                   <div class="reviewer-info">
-                    <div class="reviewer-avatar"></div>
-                    <div class="reviewer-name">{{ review.username || '匿名用户' }}</div>
+                    <div class="reviewer-avatar">
+                      <img :src="getUserAvatar(review)" alt="用户头像" class="avatar-image" />
+                    </div>
+                    <div class="reviewer-name">
+                      {{ review.anonymous ? '匿名用户' : getUserName(review) }}
+                    </div>
                   </div>
                   <div class="review-rating">
                     <div class="stars">
@@ -274,10 +279,11 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, onMounted, reactive } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useCartStore } from '@/stores/cart';
 import { useProductStore } from '@/stores/product';
+import { useUserStore } from '@/stores/user';
 import NavBar from '@/components/NavBar.vue';
 import * as productApi from '@/api/product';
 import * as reviewApi from '@/api/review';
@@ -286,6 +292,7 @@ const route = useRoute();
 const router = useRouter();
 const cartStore = useCartStore();
 const productStore = useProductStore();
+const userStore = useUserStore();
 
 // 商品ID
 const productId = parseInt(route.params.id);
@@ -300,6 +307,12 @@ const error = ref(null);
 const reviews = ref([]);
 const reviewsLoading = ref(false);
 const reviewsError = ref(null);
+const productRating = ref({ averageRating: 0, reviewCount: 0 });
+
+// 存储评价用户信息的map
+const reviewUserInfoMap = reactive({});
+// 卖家名称
+const sellerName = ref('');
 
 // 获取商品数据
 onMounted(async () => {
@@ -319,8 +332,9 @@ onMounted(async () => {
       
       console.log('从API获取的商品详情:', product.value);
       
-      // 获取商品评价
+      // 获取商品评价和评分
       fetchReviews();
+      fetchProductRating();
     } else {
       // 如果API没有返回数据，尝试从本地store获取
       const foundProduct = productStore.getProductById(productId) || 
@@ -379,6 +393,11 @@ onMounted(async () => {
   } finally {
     loading.value = false;
   }
+  
+  // 加载完商品后获取卖家和评论用户信息
+  if (product.value) {
+    await fetchSellerInfo();
+  }
 });
 
 // 商品图片 (基于API返回的图片或模拟图片)
@@ -418,17 +437,66 @@ const fetchReviews = async () => {
       // 对评价数据进行处理
       reviews.value = reviewsData.map(review => reviewApi.normalizeReview(review));
       console.log('获取到的评价数据:', reviews.value);
+      
+      // 获取所有评价的用户信息
+      const userIds = reviews.value
+        .filter(r => r.userId && !r.anonymous)
+        .map(r => r.userId);
+      
+      // 获取不重复的用户ID列表
+      const uniqueUserIds = [...new Set(userIds)];
+      
+      // 为每个用户获取信息
+      await Promise.all(uniqueUserIds.map(fetchReviewUserInfo));
+      
     } else {
       // 如果没有评价数据，使用模拟数据
       reviews.value = getMockReviews();
+      
+      // 为模拟数据添加用户信息
+      reviews.value.forEach(review => {
+        if (!review.userId) review.userId = Math.floor(Math.random() * 1000) + 1;
+        fetchReviewUserInfo(review.userId);
+      });
     }
   } catch (err) {
     console.error('获取评价失败:', err);
     reviewsError.value = '获取评价数据失败';
     // 使用模拟数据作为备选
     reviews.value = getMockReviews();
+    
+    // 为模拟数据添加用户信息
+    reviews.value.forEach(review => {
+      if (!review.userId) review.userId = Math.floor(Math.random() * 1000) + 1;
+      fetchReviewUserInfo(review.userId);
+    });
   } finally {
     reviewsLoading.value = false;
+  }
+};
+
+// 获取商品评分数据
+const fetchProductRating = async () => {
+  if (!productId) return;
+  
+  try {
+    // 从API获取评分数据
+    const ratingData = await reviewApi.getProductRating(productId);
+    
+    if (ratingData) {
+      productRating.value = {
+        averageRating: ratingData.averageRating || 0,
+        reviewCount: ratingData.reviewCount || 0
+      };
+      console.log('获取到的商品评分数据:', productRating.value);
+    }
+  } catch (err) {
+    console.error('获取商品评分失败:', err);
+    // 如果API失败，使用前端计算的评分作为备选
+    productRating.value = {
+      averageRating: calculateAverageRating(),
+      reviewCount: reviews.value.length
+    };
   }
 };
 
@@ -485,15 +553,7 @@ function isNewProduct(product) {
 
 // 根据分类ID获取分类名称
 function getCategoryName(categoryId) {
-  const categories = {
-    1: '电子产品',
-    2: '图书教材',
-    3: '生活用品',
-    4: '服装配饰',
-    5: '运动户外'
-  };
-  
-  return categories[categoryId] || '其他分类';
+  return productStore.getCategoryNameById(categoryId) || '其他分类';
 }
 
 // 格式化发布时间
@@ -592,8 +652,8 @@ function viewProduct(id) {
   router.push(`/product/${id}`);
 }
 
-// 计算平均评分
-const averageRating = computed(() => {
+// 前端计算平均评分（仅作为备选）
+const calculateAverageRating = () => {
   if (!reviews.value || reviews.value.length === 0) return 0;
   
   const sum = reviews.value.reduce((total, review) => total + review.rating, 0);
@@ -601,7 +661,72 @@ const averageRating = computed(() => {
   
   // 保留一位小数
   return Math.round(avg * 10) / 10;
+};
+
+// 计算平均评分
+const averageRating = computed(() => {
+  return productRating.value.averageRating;
 });
+
+// 获取卖家信息
+async function fetchSellerInfo() {
+  if (product.value && product.value.sellerId) {
+    try {
+      // 这里可以通过API获取卖家信息
+      // 由于我们可能没有直接的API，可以模拟一个或从已有数据中获取
+      if (!product.value.seller) {
+        sellerName.value = `ID:${product.value.sellerId}的用户`;
+        // 如果有专门的接口获取用户信息可以在这里调用
+      } else {
+        sellerName.value = product.value.seller;
+      }
+    } catch (error) {
+      console.error('获取卖家信息失败:', error);
+    }
+  }
+}
+
+// 获取评价中的用户信息
+async function fetchReviewUserInfo(userId) {
+  // 如果已经获取过该用户信息，直接返回缓存
+  if (reviewUserInfoMap[userId]) {
+    return reviewUserInfoMap[userId];
+  }
+  
+  try {
+    // 这里可以通过API获取用户信息
+    // 模拟一个用户信息返回
+    const userInfo = {
+      id: userId,
+      username: `用户${userId}`,
+      avatar: `https://dummyimage.com/50x50/ccc/${userId.toString(16).padStart(3, '0')}`
+    };
+    
+    reviewUserInfoMap[userId] = userInfo;
+    return userInfo;
+  } catch (error) {
+    console.error(`获取用户 ${userId} 信息失败:`, error);
+    return { username: `用户${userId}`, avatar: null };
+  }
+}
+
+// 获取用户名称
+function getUserName(review) {
+  if (review.username) return review.username;
+  if (review.userId && reviewUserInfoMap[review.userId]) {
+    return reviewUserInfoMap[review.userId].username;
+  }
+  return `用户${review.userId || '未知'}`;
+}
+
+// 获取用户头像
+function getUserAvatar(review) {
+  if (review.userAvatar) return review.userAvatar;
+  if (review.userId && reviewUserInfoMap[review.userId] && reviewUserInfoMap[review.userId].avatar) {
+    return reviewUserInfoMap[review.userId].avatar;
+  }
+  return 'https://dummyimage.com/50x50/ccc/333'; // 默认头像
+}
 </script>
 
 <style scoped>
@@ -1126,8 +1251,15 @@ const averageRating = computed(() => {
   width: 40px;
   height: 40px;
   border-radius: 50%;
-  background-color: #eee;
+  overflow: hidden;
   margin-right: 10px;
+  background-color: #f0f0f0;
+}
+
+.reviewer-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 
 .reviewer-name {

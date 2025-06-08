@@ -42,21 +42,6 @@
       <div class="container">
         <div class="filter-container">
           <div class="filter-group">
-            <label class="filter-label">价格区间：</label>
-            <el-slider
-              v-model="priceRange"
-              range
-              :min="0"
-              :max="2000"
-              :step="50"
-              class="price-slider"
-              :show-stops="false"
-              :format-tooltip="value => `¥${value}`"
-            ></el-slider>
-            <span class="price-display">¥{{ priceRange[0] }} - ¥{{ priceRange[1] }}</span>
-          </div>
-          
-          <div class="filter-group">
             <label class="filter-label">排序方式：</label>
             <div class="sort-options">
               <button 
@@ -149,6 +134,10 @@
               <div class="price-info">
                 <span class="price">¥{{ product.price }}</span>
                 <span class="original-price" v-if="product.originalPrice">¥{{ product.originalPrice }}</span>
+                <div class="rating-info" v-if="product.averageRating > 0">
+                  <span class="rating">{{ product.averageRating.toFixed(1) }}</span>
+                  <span class="rating-count">({{ product.reviewCount }}条评价)</span>
+                </div>
               </div>
               <div class="product-footer">
                 <span class="stock-info" :class="{ 'low-stock': product.stock <= 3 && product.stock > 0 }">
@@ -343,7 +332,6 @@ const getCategoryCount = (categoryId) => {
 
 // 筛选和排序状态
 const selectedCategory = ref(null);
-const priceRange = ref([0, 2000]);
 const sortOption = ref('default');
 const onlyInStock = ref(false);
 const searchKeyword = ref('');
@@ -376,7 +364,6 @@ const applySorting = () => {
 // 重置所有筛选条件
 const resetFilters = () => {
   selectedCategory.value = null;
-  priceRange.value = [0, 2000];
   sortOption.value = 'default';
   onlyInStock.value = false;
   searchKeyword.value = '';
@@ -461,11 +448,6 @@ const filteredProducts = computed(() => {
   if (selectedCategory.value) {
     result = result.filter(product => product.categoryId === selectedCategory.value);
   }
-  
-  // 应用价格范围筛选
-  result = result.filter(product => 
-    product.price >= priceRange.value[0] && product.price <= priceRange.value[1]
-  );
   
   // 应用库存筛选
   if (onlyInStock.value) {
@@ -755,21 +737,6 @@ function showToast(message, type = 'info', duration = 2000) {
   color: #666;
   white-space: nowrap;
   font-weight: 500;
-}
-
-.price-slider {
-  flex: 1;
-}
-
-.price-display {
-  min-width: 100px;
-  padding: 5px 10px;
-  background-color: #f0f9ff;
-  border-radius: 4px;
-  color: #4a99e9;
-  font-weight: bold;
-  font-size: 13px;
-  text-align: center;
 }
 
 .sort-options {
@@ -1613,5 +1580,22 @@ function showToast(message, type = 'info', duration = 2000) {
 @keyframes spin {
   0% { transform: rotate(0deg); }
   100% { transform: rotate(360deg); }
+}
+
+.rating-info {
+  display: flex;
+  align-items: center;
+  margin-left: auto;
+  font-size: 0.85rem;
+}
+
+.rating {
+  color: #f60;
+  font-weight: bold;
+  margin-right: 2px;
+}
+
+.rating-count {
+  color: #999;
 }
 </style>

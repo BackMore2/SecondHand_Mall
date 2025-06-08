@@ -16,12 +16,13 @@ export const getProductReviews = async (productId) => {
 };
 
 /**
- * 添加商品评价
+ * 添加商品评价 - 简化版本，直接发送数据到后端
  * @param {Object} reviewData 评价数据
  * @returns {Promise<Object>} 创建的评价数据
  */
 export const addReview = async (reviewData) => {
   try {
+    // 直接发送请求，依靠后端验证和处理
     const response = await api.post('/reviews', reviewData);
     return response.data;
   } catch (error) {
@@ -42,6 +43,26 @@ export const getUserReviews = async (userId) => {
   } catch (error) {
     console.error('获取用户评价失败:', error);
     throw error;
+  }
+};
+
+/**
+ * 获取商品的评分信息
+ * @param {number} productId 商品ID
+ * @returns {Promise<Object>} 包含平均评分和评价数量的对象
+ */
+export const getProductRating = async (productId) => {
+  try {
+    const response = await api.get(`/reviews/product/${productId}/rating`);
+    return response.data;
+  } catch (error) {
+    console.error('获取商品评分失败:', error);
+    // 返回默认评分信息，避免前端显示错误
+    return {
+      productId: productId,
+      averageRating: 0,
+      reviewCount: 0
+    };
   }
 };
 

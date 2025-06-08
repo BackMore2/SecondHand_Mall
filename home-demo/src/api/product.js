@@ -1,4 +1,5 @@
 import api from './auth';
+import { getProductRating } from './review';
 
 // 检查并输出当前认证状态（调试用）
 export const checkAuth = () => {
@@ -16,6 +17,25 @@ export const getAllProducts = async () => {
     // 输出认证状态
     checkAuth();
     const response = await api.get('/products');
+    
+    // 获取所有商品的评分信息
+    const products = response.data.content || response.data;
+    
+    // 为每个商品添加评分信息
+    if (Array.isArray(products) && products.length > 0) {
+      for (const product of products) {
+        try {
+          const ratingData = await getProductRating(product.id);
+          product.averageRating = ratingData.averageRating || 0;
+          product.reviewCount = ratingData.reviewCount || 0;
+        } catch (error) {
+          console.error(`获取商品 ${product.id} 的评分信息失败:`, error);
+          product.averageRating = 0;
+          product.reviewCount = 0;
+        }
+      }
+    }
+    
     return response.data;
   } catch (error) {
     throw error;
@@ -26,6 +46,18 @@ export const getAllProducts = async () => {
 export const getProductById = async (id) => {
   try {
     const response = await api.get(`/products/${id}`);
+    
+    // 获取商品评分信息
+    try {
+      const ratingData = await getProductRating(id);
+      response.data.averageRating = ratingData.averageRating || 0;
+      response.data.reviewCount = ratingData.reviewCount || 0;
+    } catch (error) {
+      console.error(`获取商品 ${id} 的评分信息失败:`, error);
+      response.data.averageRating = 0;
+      response.data.reviewCount = 0;
+    }
+    
     return response.data;
   } catch (error) {
     throw error;

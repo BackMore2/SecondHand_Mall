@@ -13,6 +13,8 @@ import OrderCompletePage from '@/views/OrderCompletePage.vue';
 import ProductDetailPage from '@/views/ProductDetailPage.vue';
 import ProductPublishPage from '@/views/ProductPublishPage.vue';
 import ProductPreviewPage from '@/views/ProductPreviewPage.vue';
+import ProductReviewPage from '@/views/ProductReviewPage.vue';
+import OrderReviewPage from '@/views/OrderReviewPage.vue';
 
 // 修复变量名称拼写错误
 const routes = [
@@ -30,7 +32,9 @@ const routes = [
     { path: '/order/complete/:id', component: OrderCompletePage },
     { path: '/product/publish', component: ProductPublishPage },
     { path: '/product/preview', component: ProductPreviewPage },
-    { path: '/product/:id', component: ProductDetailPage }
+    { path: '/product/:id', component: ProductDetailPage },
+    { path: '/product/:id/review', component: ProductReviewPage },
+    { path: '/order/:id/review', component: OrderReviewPage }
 ];
 
 const router = createRouter({
