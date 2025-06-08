@@ -9,6 +9,7 @@ import OrdersPage from '@/views/OrdersPage.vue';
 import OrderDetailPage from '@/views/OrderDetailPage.vue';
 import OrderCreatePage from '@/views/OrderCreatePage.vue';
 import OrderPayPage from '@/views/OrderPayPage.vue';
+import OrderCompletePage from '@/views/OrderCompletePage.vue';
 import ProductDetailPage from '@/views/ProductDetailPage.vue';
 import ProductPublishPage from '@/views/ProductPublishPage.vue';
 import ProductPreviewPage from '@/views/ProductPreviewPage.vue';
@@ -26,6 +27,7 @@ const routes = [
     { path: '/orders/:id', component: OrderDetailPage },
     { path: '/order/create', component: OrderCreatePage },
     { path: '/order/pay/:id', component: OrderPayPage },
+    { path: '/order/complete/:id', component: OrderCompletePage },
     { path: '/product/publish', component: ProductPublishPage },
     { path: '/product/preview', component: ProductPreviewPage },
     { path: '/product/:id', component: ProductDetailPage }

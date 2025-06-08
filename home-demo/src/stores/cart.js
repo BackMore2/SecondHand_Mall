@@ -480,7 +480,7 @@ async addToCart(productId, quantity = 1) {
                         
                         // 只有在所有项都成功删除的情况下，才将同步状态设为true
                         if (failCount === 0) {
-                            this.isSync = true;
+                        this.isSync = true;
                         } else {
                             this.isSync = false;
                             this.error = `部分购物车项删除失败(${failCount}/${backupItems.length})`;

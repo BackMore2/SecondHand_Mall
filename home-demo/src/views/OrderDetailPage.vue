@@ -10,141 +10,143 @@
         </router-link>
       </div>
       
-      <div class="order-status-banner" :class="orderStatusClass">
-        <div class="status-icon">
-          <i :class="statusIcon"></i>
-        </div>
-        <div class="status-info">
-          <h2>{{ orderInfo.status }}</h2>
-          <p v-if="orderInfo.status === '待付款'">
-            请在 <span class="countdown">{{ remainingTime }}</span> 内完成支付
-          </p>
-          <p v-else-if="orderInfo.status === '待发货'">
-            卖家正在处理您的订单，请耐心等待
-          </p>
-          <p v-else-if="orderInfo.status === '已发货'">
-            您的包裹已在路上，请注意查收
-          </p>
-          <p v-else-if="orderInfo.status === '已完成'">
-            交易已完成，感谢您的购买
-          </p>
-          <p v-else-if="orderInfo.status === '已取消'">
-            订单已取消
-          </p>
-        </div>
+      <div v-if="loading" class="loading-container">
+        <div class="loading-spinner"></div>
+        <p>正在加载订单信息...</p>
       </div>
       
-      <!-- 订单基本信息 -->
-      <div class="info-section order-base-info">
-        <h3>订单信息</h3>
-        <div class="info-row">
-          <span class="info-label">订单编号：</span>
-          <span class="info-value">{{ orderInfo.id }}</span>
-        </div>
-        <div class="info-row">
-          <span class="info-label">下单时间：</span>
-          <span class="info-value">{{ formatTime(orderInfo.createTime) }}</span>
-        </div>
-        <div class="info-row">
-          <span class="info-label">支付方式：</span>
-          <span class="info-value">{{ paymentMethod }}</span>
-        </div>
-        <div class="info-row">
-          <span class="info-label">支付时间：</span>
-          <span class="info-value">{{ orderInfo.payTime ? formatTime(orderInfo.payTime) : '未支付' }}</span>
-        </div>
+      <div v-else-if="error" class="error-container">
+        <i class="fas fa-exclamation-circle"></i>
+        <p>{{ error }}</p>
+        <button @click="fetchOrderData" class="retry-btn">重试</button>
       </div>
       
-      <!-- 收货信息 -->
-      <div class="info-section delivery-info">
-        <h3>收货信息</h3>
-        <div class="info-row">
-          <span class="info-label">收货人：</span>
-          <span class="info-value">{{ orderInfo.recipient }}</span>
-        </div>
-        <div class="info-row">
-          <span class="info-label">联系电话：</span>
-          <span class="info-value">{{ orderInfo.phone }}</span>
-        </div>
-        <div class="info-row">
-          <span class="info-label">收货地址：</span>
-          <span class="info-value address">{{ orderInfo.address }}</span>
-        </div>
-      </div>
-      
-      <!-- 商品信息 -->
-      <div class="info-section product-info">
-        <h3>商品信息</h3>
-        <div class="product-list">
-          <div v-for="(item, index) in orderInfo.products" :key="index" class="product-item">
-            <div class="product-img">
-              <img :src="item.image" :alt="item.title" />
-            </div>
-            <div class="product-details">
-              <h4 class="product-title">{{ item.title }}</h4>
-              <p class="product-desc">{{ item.description }}</p>
-            </div>
-            <div class="product-price">¥{{ item.price.toFixed(2) }}</div>
-            <div class="product-quantity">x{{ item.quantity }}</div>
-            <div class="product-subtotal">¥{{ (item.price * item.quantity).toFixed(2) }}</div>
+      <template v-else-if="orderInfo">
+        <div class="order-status-banner" :class="orderStatusClass">
+          <div class="status-icon">
+            <i :class="statusIcon"></i>
+          </div>
+          <div class="status-info">
+            <h2>{{ orderInfo.status }}</h2>
+            <p v-if="orderInfo.status === '待付款' || orderInfo.status === 'PENDING'">
+              请尽快完成支付
+            </p>
+            <p v-else-if="orderInfo.status === '待发货' || orderInfo.status === 'PAID'">
+              卖家正在处理您的订单，请耐心等待
+            </p>
+            <p v-else-if="orderInfo.status === '已发货' || orderInfo.status === 'SHIPPED'">
+              您的包裹已在路上，请注意查收
+            </p>
+            <p v-else-if="orderInfo.status === '已完成' || orderInfo.status === 'COMPLETED'">
+              交易已完成，感谢您的购买
+            </p>
+            <p v-else-if="orderInfo.status === '已取消' || orderInfo.status === 'CANCELED'">
+              订单已取消
+            </p>
           </div>
         </div>
-        <div class="order-total">
-          <div class="total-row">
-            <span>商品总计：</span>
-            <span>¥{{ calculateSubtotal().toFixed(2) }}</span>
-          </div>
-          <div class="total-row">
-            <span>运费：</span>
-            <span>¥{{ orderInfo.shipping.toFixed(2) }}</span>
-          </div>
-          <div class="total-row amount">
-            <span>订单总计：</span>
-            <span>¥{{ (calculateSubtotal() + orderInfo.shipping).toFixed(2) }}</span>
-          </div>
-        </div>
-      </div>
-      
-      <!-- 物流信息 -->
-      <div class="info-section logistics-info" v-if="orderInfo.status === '已发货' || orderInfo.status === '已完成'">
-        <h3>物流信息</h3>
-        <div class="logistics-details">
+        
+        <!-- 订单基本信息 -->
+        <div class="info-section order-base-info">
+          <h3>订单信息</h3>
           <div class="info-row">
-            <span class="info-label">物流公司：</span>
-            <span class="info-value">{{ orderInfo.logistics.company }}</span>
+            <span class="info-label">订单编号：</span>
+            <span class="info-value">{{ orderInfo.orderNumber || orderInfo.id || "未知编号" }}</span>
           </div>
           <div class="info-row">
-            <span class="info-label">物流单号：</span>
-            <span class="info-value">{{ orderInfo.logistics.trackingNumber }}</span>
+            <span class="info-label">下单时间：</span>
+            <span class="info-value">{{ formatTime(orderInfo.createdAt || orderInfo.createTime || orderInfo.createDate) }}</span>
+          </div>
+          <div class="info-row">
+            <span class="info-label">支付方式：</span>
+            <span class="info-value">{{ getPaymentMethodName(orderInfo.paymentMethod) }}</span>
+          </div>
+          <div class="info-row">
+            <span class="info-label">订单状态：</span>
+            <span class="info-value">{{ orderInfo.status || "未知状态" }}</span>
           </div>
         </div>
-        <div class="tracking-timeline">
-          <div v-for="(track, index) in orderInfo.logistics.tracking" :key="index" class="tracking-item">
-            <div class="tracking-time">{{ formatTime(track.time) }}</div>
-            <div class="tracking-info">{{ track.info }}</div>
+        
+        <!-- 收货信息 -->
+        <div class="info-section delivery-info">
+          <h3>收货信息</h3>
+          <div class="info-row">
+            <span class="info-label">收货地址：</span>
+            <span class="info-value address">{{ orderInfo.shippingAddress || orderInfo.address || "未设置地址" }}</span>
           </div>
         </div>
-      </div>
+        
+        <!-- 商品信息 -->
+        <div class="info-section product-info">
+          <h3>商品信息</h3>
+          <div class="product-list">
+            <div v-for="(item, index) in orderItems" :key="index" class="product-item">
+              <div class="product-img">
+                <img :src="productDetails[item.productId]?.mainImage || item.image || 'https://via.placeholder.com/80'" 
+                     :alt="productDetails[item.productId]?.name || `商品 #${item.productId}`" />
+              </div>
+              <div class="product-details">
+                <h4 class="product-title">{{ productDetails[item.productId]?.name || `商品 #${item.productId}` }}</h4>
+                <p class="product-desc">{{ productDetails[item.productId]?.description || item.description || '无描述' }}</p>
+              </div>
+              <div class="product-price">¥{{ formatPrice(item.price) }}</div>
+              <div class="product-quantity">x{{ item.quantity }}</div>
+              <div class="product-subtotal">¥{{ formatPrice(item.totalPrice || (item.price * item.quantity)) }}</div>
+              <div class="product-actions">
+                <button class="review-btn" @click="goToReview(item.productId)">
+                  <i class="fas fa-comment"></i> 去评论
+                </button>
+              </div>
+            </div>
+          </div>
+          <div class="order-total">
+            <div class="total-row">
+              <span>商品总计：</span>
+              <span>¥{{ formatPrice(calculateSubtotal()) }}</span>
+            </div>
+            <div class="total-row">
+              <span>运费：</span>
+              <span>¥0.00</span>
+            </div>
+            <div class="total-row amount">
+              <span>订单总计：</span>
+              <span>¥{{ formatPrice(orderInfo.totalPrice || calculateSubtotal()) }}</span>
+            </div>
+          </div>
+        </div>
+        
+        <!-- 操作按钮 -->
+        <div class="action-buttons">
+          <button v-if="orderInfo.status === '待付款' || orderInfo.status === 'PENDING'" 
+                 class="btn pay-btn" @click="goToPay">
+            去支付
+          </button>
+          <button v-if="orderInfo.status === '待付款' || orderInfo.status === 'PENDING'" 
+                 class="btn cancel-btn" @click="cancelOrder">
+            取消订单
+          </button>
+          <button v-if="orderInfo.status === '已发货' || orderInfo.status === 'SHIPPED'"
+                 class="btn confirm-btn" @click="confirmReceive">
+            确认收货
+          </button>
+          <button v-if="orderInfo.status === '已完成' || orderInfo.status === 'COMPLETED'"
+                 class="btn review-all-btn" @click="reviewAllProducts">
+            评价全部商品
+          </button>
+          <button class="btn contact-btn" @click="contactSeller">
+            联系卖家
+          </button>
+        </div>
+      </template>
       
-      <!-- 操作按钮 -->
-      <div class="action-buttons">
-        <button v-if="orderInfo.status === '待付款'" class="btn pay-btn" @click="goToPay">
-          去支付
-        </button>
-        <button v-if="orderInfo.status === '待付款'" class="btn cancel-btn" @click="cancelOrder">
-          取消订单
-        </button>
-        <button v-if="orderInfo.status === '已发货'" class="btn confirm-btn" @click="confirmReceive">
-          确认收货
-        </button>
-        <button v-if="orderInfo.status === '已完成'" class="btn review-btn" @click="reviewOrder">
-          评价订单
-        </button>
-        <button class="btn contact-btn" @click="contactSeller">
-          联系卖家
-        </button>
+      <div v-else class="empty-state">
+        <i class="fas fa-box-open"></i>
+        <p>订单信息不存在</p>
+        <router-link to="/orders" class="link-btn">查看我的订单</router-link>
       </div>
     </div>
+    
+
   </div>
 </template>
 
@@ -152,183 +154,301 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import NavBar from '../components/NavBar.vue'
+import * as orderApi from '@/api/order' // 导入订单API
+import * as productApi from '@/api/product' // 导入产品API
 
 const route = useRoute()
 const router = useRouter()
-const orderId = route.params.id
+const orderId = Number(route.params.id)
 
-// 模拟订单数据
-const orderInfo = ref({
-  id: 'ORD20230515001',
-  status: '已发货',
-  createTime: new Date('2023-05-15T10:30:00'),
-  payTime: new Date('2023-05-15T10:35:00'),
-  paymentMethodId: 'alipay',
-  recipient: '张三',
-  phone: '13800138000',
-  address: '北京市海淀区清华大学29号楼',
-  shipping: 10,
-  products: [
-    {
-      id: 1,
-      title: '二手笔记本电脑',
-      description: 'i5处理器，8GB内存，256GB固态硬盘',
-      price: 2899,
-      quantity: 1,
-      image: 'https://via.placeholder.com/100'
-    },
-    {
-      id: 2,
-      title: '专业相机套装',
-      description: '含18-55mm镜头，64GB存储卡',
-      price: 1299,
-      quantity: 1,
-      image: 'https://via.placeholder.com/100'
-    }
-  ],
-  logistics: {
-    company: '顺丰速运',
-    trackingNumber: 'SF1234567890',
-    tracking: [
-      { time: new Date('2023-05-16T14:00:00'), info: '快件已由【北京海淀区中转站】发出' },
-      { time: new Date('2023-05-16T10:30:00'), info: '快件已到达【北京海淀区中转站】' },
-      { time: new Date('2023-05-15T18:45:00'), info: '卖家已发货' }
-    ]
-  }
-})
+// 状态变量
+const orderInfo = ref(null)
+const orderItems = ref([])
+const productDetails = ref({}) // 存储商品详情
+const loading = ref(true)
+const error = ref(null)
+
 
 // 支付方式映射
 const paymentMethods = {
-  alipay: '支付宝',
-  wechat: '微信支付',
-  card: '银行卡'
+  'alipay': '支付宝',
+  'wechat': '微信支付',
+  'card': '银行卡支付',
+  'ALIPAY': '支付宝',
+  'WECHAT': '微信支付',
+  'CARD': '银行卡支付'
 }
 
 // 获取支付方式名称
-const paymentMethod = computed(() => {
-  return paymentMethods[orderInfo.value.paymentMethodId] || '未知'
-})
+const getPaymentMethodName = (methodId) => {
+  return paymentMethods[methodId] || methodId || '未选择'
+}
 
 // 计算订单状态对应的样式类
 const orderStatusClass = computed(() => {
-  const status = orderInfo.value.status
-  const classMap = {
-    '待付款': 'status-pending-payment',
-    '待发货': 'status-pending-shipment',
-    '已发货': 'status-shipped',
-    '已完成': 'status-completed',
-    '已取消': 'status-canceled'
+  const status = orderInfo.value?.status
+  
+  if (!status) return ''
+  
+  const statusLower = status.toLowerCase()
+  if (statusLower.includes('pend') || statusLower.includes('待付款')) {
+    return 'status-pending-payment'
+  } else if (statusLower.includes('paid') || statusLower.includes('待发货')) {
+    return 'status-pending-shipment'
+  } else if (statusLower.includes('ship') || statusLower.includes('已发货')) {
+    return 'status-shipped'
+  } else if (statusLower.includes('complete') || statusLower.includes('已完成')) {
+    return 'status-completed'
+  } else if (statusLower.includes('cancel') || statusLower.includes('已取消')) {
+    return 'status-canceled'
   }
-  return classMap[status] || ''
+  return ''
 })
 
 // 计算订单状态对应的图标
 const statusIcon = computed(() => {
-  const status = orderInfo.value.status
-  const iconMap = {
-    '待付款': 'fas fa-credit-card',
-    '待发货': 'fas fa-box',
-    '已发货': 'fas fa-shipping-fast',
-    '已完成': 'fas fa-check-circle',
-    '已取消': 'fas fa-times-circle'
+  const status = orderInfo.value?.status
+  
+  if (!status) return 'fas fa-question-circle'
+  
+  const statusLower = status.toLowerCase()
+  if (statusLower.includes('pend') || statusLower.includes('待付款')) {
+    return 'fas fa-credit-card'
+  } else if (statusLower.includes('paid') || statusLower.includes('待发货')) {
+    return 'fas fa-box'
+  } else if (statusLower.includes('ship') || statusLower.includes('已发货')) {
+    return 'fas fa-shipping-fast'
+  } else if (statusLower.includes('complete') || statusLower.includes('已完成')) {
+    return 'fas fa-check-circle'
+  } else if (statusLower.includes('cancel') || statusLower.includes('已取消')) {
+    return 'fas fa-times-circle'
   }
-  return iconMap[status] || 'fas fa-question-circle'
+  return 'fas fa-question-circle'
 })
-
-// 计算剩余支付时间（假设有30分钟支付时间）
-const remainingTime = ref('00:00:00')
 
 // 格式化时间
 function formatTime(time) {
-  if (!time) return ''
-  return new Date(time).toLocaleString()
+  if (!time) return '未知'
+  try {
+    return new Date(time).toLocaleString('zh-CN', {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit'
+    })
+  } catch (e) {
+    return time.toString()
+  }
+}
+
+// 格式化价格
+function formatPrice(price) {
+  if (price === null || price === undefined) return '0.00'
+  return Number(price).toFixed(2)
 }
 
 // 计算商品总价
 function calculateSubtotal() {
-  return orderInfo.value.products.reduce((sum, item) => sum + item.price * item.quantity, 0)
+  if (!orderItems.value || orderItems.value.length === 0) return 0
+  return orderItems.value.reduce((sum, item) => {
+    const itemTotal = item.totalPrice || (item.price * item.quantity)
+    return sum + Number(itemTotal)
+  }, 0)
+}
+
+// 根据产品ID获取产品详情
+async function fetchProductDetails(productId) {
+  try {
+    const response = await productApi.getProductById(productId)
+    
+    // 使用递归函数解包可能的嵌套结构
+    const product = unwrapNestedData(response)
+    
+    // 添加到产品详情缓存
+    productDetails.value[productId] = {
+      id: productId,
+      name: product.name || product.title || `商品 #${productId}`,
+      description: product.description || '无描述',
+      mainImage: product.mainImage || product.image || null,
+      price: product.price
+    }
+  } catch (err) {
+    console.error(`获取商品 #${productId} 详情失败:`, err)
+  }
+}
+
+// 递归处理嵌套数据结构，解决无限嵌套问题
+function unwrapNestedData(data) {
+  if (!data) return null;
+  
+  // 如果有data属性并且是对象，递归解析
+  if (data.data && typeof data.data === 'object') {
+    return unwrapNestedData(data.data);
+  }
+  
+  return data;
+}
+
+// 递归处理嵌套数组，解决item无限嵌套问题
+function unwrapNestedArray(arr) {
+  if (!Array.isArray(arr)) return [];
+  
+  return arr.map(item => {
+    // 如果item中有data属性且是对象，使用data中的内容
+    if (item.data && typeof item.data === 'object') {
+      return { ...item.data };
+    }
+    return item;
+  });
+}
+
+// 获取订单数据
+async function fetchOrderData() {
+  loading.value = true
+  error.value = null
+  
+  try {
+    console.log(`正在获取订单 #${orderId} 的详细信息...`)
+    // 获取订单详情
+    const response = await orderApi.getOrderDetail(orderId)
+    
+    // 解包嵌套数据结构
+    orderInfo.value = unwrapNestedData(response)
+    console.log('处理后的订单信息:', orderInfo.value)
+    
+    // 提取订单项
+    let items = []
+    
+    // 先检查orderInfo中是否包含订单项
+    if (orderInfo.value.items && Array.isArray(orderInfo.value.items)) {
+      items = unwrapNestedArray(orderInfo.value.items)
+      console.log('从订单中获取并处理订单项:', items)
+    } 
+    // 都没有则单独请求
+    else {
+      console.log('单独获取订单项...')
+      try {
+        const itemsResponse = await orderApi.getOrderItems(orderId)
+        
+        if (Array.isArray(itemsResponse)) {
+          items = unwrapNestedArray(itemsResponse)
+        } else if (itemsResponse && itemsResponse.data && Array.isArray(itemsResponse.data)) {
+          items = unwrapNestedArray(itemsResponse.data)
+        }
+        
+        console.log('获取并处理后的订单项:', items)
+      } catch (itemErr) {
+        console.error('获取订单项失败:', itemErr)
+      }
+    }
+    
+    orderItems.value = items || []
+    
+    // 获取所有商品的详细信息
+    const productIds = orderItems.value.map(item => item.productId).filter(id => id)
+    
+    // 过滤掉重复的产品ID
+    const uniqueProductIds = [...new Set(productIds)]
+    
+    if (uniqueProductIds.length > 0) {
+      // 并行获取所有产品详情
+      await Promise.all(uniqueProductIds.map(productId => fetchProductDetails(productId)))
+    }
+    
+  } catch (err) {
+    console.error('获取订单数据失败:', err)
+    error.value = err.message || '获取订单数据失败，请稍后重试'
+  } finally {
+    loading.value = false
+  }
 }
 
 // 前往支付页面
 function goToPay() {
-  router.push(`/order/pay/${orderInfo.value.id}`)
+  router.push(`/order/pay/${orderId}`)
 }
 
 // 取消订单
-function cancelOrder() {
-  if (confirm('确定要取消此订单吗？')) {
-    // 这里应该调用API取消订单
-    orderInfo.value.status = '已取消'
+async function cancelOrder() {
+  if (!confirm('确定要取消此订单吗？')) return
+  
+  try {
+    loading.value = true
+    await orderApi.cancelOrder(orderId)
+    alert('订单已取消')
+    
+    // 刷新订单数据
+    await fetchOrderData()
+  } catch (err) {
+    alert(`取消订单失败: ${err.message || '未知错误'}`)
+    console.error('取消订单失败:', err)
+  } finally {
+    loading.value = false
   }
 }
 
 // 确认收货
-function confirmReceive() {
-  if (confirm('确认已收到商品？')) {
-    // 这里应该调用API确认收货
-    orderInfo.value.status = '已完成'
+async function confirmReceive() {
+  if (!confirm('确认已收到商品？')) return
+  
+  try {
+    loading.value = true
+    await orderApi.confirmOrder(orderId)
+    alert('已确认收货')
+    
+    // 刷新订单数据
+    await fetchOrderData()
+  } catch (err) {
+    alert(`确认收货失败: ${err.message || '未知错误'}`)
+    console.error('确认收货失败:', err)
+  } finally {
+    loading.value = false
   }
 }
 
-// 评价订单
-function reviewOrder() {
-  router.push(`/order/review/${orderInfo.value.id}`)
+// 前往评论单个商品
+function goToReview(productId) {
+  router.push(`/product/${productId}/review?orderId=${orderId}`)
+}
+
+// 评价所有商品
+function reviewAllProducts() {
+  router.push(`/order/${orderId}/review`)
 }
 
 // 联系卖家
 function contactSeller() {
-  router.push(`/messages?seller=${orderInfo.value.id}`)
+  // 这里可以添加联系卖家的逻辑
+  alert('联系卖家功能尚未实现')
 }
 
-// 模拟获取订单数据
+// 页面加载时获取订单数据
 onMounted(() => {
-  // 这里应该调用API获取订单数据
-  console.log('获取订单详情，ID:', orderId)
-  
-  // 如果状态是待付款，开始倒计时
-  if (orderInfo.value.status === '待付款') {
-    // 计算剩余时间
-    const deadline = new Date(orderInfo.value.createTime)
-    deadline.setMinutes(deadline.getMinutes() + 30)
-    
-    const timer = setInterval(() => {
-      const now = new Date()
-      const diff = deadline - now
-      
-      if (diff <= 0) {
-        clearInterval(timer)
-        remainingTime.value = '00:00:00'
-        // 订单超时，自动取消
-        orderInfo.value.status = '已取消'
-        return
-      }
-      
-      // 格式化剩余时间
-      const hours = Math.floor(diff / 3600000).toString().padStart(2, '0')
-      const minutes = Math.floor((diff % 3600000) / 60000).toString().padStart(2, '0')
-      const seconds = Math.floor((diff % 60000) / 1000).toString().padStart(2, '0')
-      remainingTime.value = `${hours}:${minutes}:${seconds}`
-    }, 1000)
+  if (!orderId) {
+    error.value = '未提供有效的订单ID'
+    loading.value = false
+    return
   }
+  
+  fetchOrderData()
 })
 </script>
 
 <style scoped>
 .order-detail-page {
   min-height: 100vh;
+  background-color: transparent;
 }
 
-.container {
-  position: relative;
-  z-index: 1;
-  background-color: rgba(255, 255, 255, 0.85);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-  border-radius: 20px;
-  box-shadow: 0 15px 35px rgba(0, 0, 0, 0.2);
-  margin: 2rem auto;
-  padding: 2rem;
+.content-container {
   max-width: 1000px;
+  margin: 0 auto;
+  padding: 20px;
+  background-color: transparent;
+  margin-top: 20px;
+  margin-bottom: 40px;
 }
 
 .back-link {
@@ -357,6 +477,7 @@ onMounted(() => {
   border-radius: 8px;
   margin-bottom: 30px;
   color: #fff;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
 }
 
 .status-pending-payment {
@@ -394,20 +515,33 @@ onMounted(() => {
   opacity: 0.9;
 }
 
-.countdown {
-  font-weight: bold;
-}
-
 .info-section {
   margin-bottom: 30px;
-  padding-bottom: 20px;
-  border-bottom: 1px solid #eee;
+  padding: 20px;
+  border-radius: 8px;
+  background-color: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(10px);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
 }
 
 .info-section h3 {
   margin-bottom: 15px;
   font-size: 18px;
   color: #555;
+  position: relative;
+  padding-left: 12px;
+}
+
+.info-section h3::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 4px;
+  height: 16px;
+  background-color: #409EFF;
+  border-radius: 2px;
 }
 
 .info-row {
@@ -418,6 +552,7 @@ onMounted(() => {
 .info-label {
   width: 100px;
   color: #909399;
+  font-weight: 500;
 }
 
 .info-value {
@@ -430,16 +565,23 @@ onMounted(() => {
 }
 
 .product-list {
-  border: 1px solid #eee;
-  border-radius: 4px;
+  border-radius: 8px;
   margin-bottom: 20px;
+  background-color: rgba(255, 255, 255, 0.6);
+  overflow: hidden;
+  box-shadow: 0 1px 5px rgba(0, 0, 0, 0.05);
 }
 
 .product-item {
   display: flex;
   align-items: center;
   padding: 15px;
-  border-bottom: 1px solid #eee;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+  transition: background-color 0.3s;
+}
+
+.product-item:hover {
+  background-color: rgba(255, 255, 255, 0.8);
 }
 
 .product-item:last-child {
@@ -450,56 +592,99 @@ onMounted(() => {
   width: 80px;
   height: 80px;
   margin-right: 15px;
+  flex-shrink: 0;
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
 }
 
 .product-img img {
   width: 100%;
   height: 100%;
   object-fit: cover;
-  border-radius: 4px;
 }
 
 .product-details {
   flex: 1;
+  min-width: 0;
 }
 
 .product-title {
   margin: 0 0 5px 0;
   font-size: 16px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
+  color: #303133;
 }
 
 .product-desc {
   color: #909399;
   margin: 0;
   font-size: 14px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .product-price, .product-quantity, .product-subtotal {
   margin: 0 15px;
+  white-space: nowrap;
 }
 
 .product-price {
   color: #f56c6c;
-  width: 100px;
+  width: 80px;
   text-align: center;
+  flex-shrink: 0;
+  font-weight: 500;
 }
 
 .product-quantity {
-  width: 50px;
+  width: 40px;
   text-align: center;
+  flex-shrink: 0;
+  color: #606266;
 }
 
 .product-subtotal {
-  width: 100px;
+  width: 80px;
   text-align: right;
   font-weight: bold;
   color: #f56c6c;
+  flex-shrink: 0;
+}
+
+.product-actions {
+  margin-left: 15px;
+  flex-shrink: 0;
+}
+
+.review-btn {
+  padding: 6px 10px;
+  background-color: #e6a23c;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.3s;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+}
+
+.review-btn:hover {
+  background-color: #d49731;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
 }
 
 .order-total {
-  background-color: #f9f9f9;
+  background-color: rgba(255, 255, 255, 0.7);
   padding: 15px;
-  border-radius: 4px;
+  border-radius: 8px;
+  backdrop-filter: blur(10px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
 }
 
 .total-row {
@@ -517,50 +702,12 @@ onMounted(() => {
   border-top: 1px dashed #ddd;
 }
 
-.logistics-details {
-  margin-bottom: 20px;
-}
-
-.tracking-timeline {
-  border-left: 2px solid #eee;
-  padding-left: 20px;
-  margin-left: 10px;
-}
-
-.tracking-item {
-  position: relative;
-  margin-bottom: 15px;
-}
-
-.tracking-item:before {
-  content: '';
-  position: absolute;
-  left: -26px;
-  top: 5px;
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  background-color: #409EFF;
-}
-
-.tracking-item:first-child:before {
-  background-color: #67c23a;
-}
-
-.tracking-time {
-  color: #909399;
-  font-size: 14px;
-  margin-bottom: 5px;
-}
-
-.tracking-info {
-  color: #606266;
-}
-
 .action-buttons {
   display: flex;
   justify-content: flex-end;
   gap: 15px;
+  flex-wrap: wrap;
+  margin-top: 30px;
 }
 
 .btn {
@@ -570,6 +717,12 @@ onMounted(() => {
   cursor: pointer;
   transition: all 0.3s;
   border: none;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+}
+
+.btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.15);
 }
 
 .pay-btn {
@@ -599,12 +752,12 @@ onMounted(() => {
   background-color: #5daf34;
 }
 
-.review-btn {
+.review-all-btn {
   background-color: #e6a23c;
   color: white;
 }
 
-.review-btn:hover {
+.review-all-btn:hover {
   background-color: #d49731;
 }
 
@@ -616,4 +769,95 @@ onMounted(() => {
 .contact-btn:hover {
   background-color: #3a8ee6;
 }
-</style> 
+
+.link-btn {
+  padding: 10px 20px;
+  background-color: #f4f4f5;
+  color: #606266;
+  text-decoration: none;
+  border-radius: 4px;
+  transition: all 0.3s;
+  display: inline-block;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
+}
+
+.link-btn:hover {
+  color: #409EFF;
+  background-color: #ecf5ff;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+.loading-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 0;
+  background-color: rgba(255, 255, 255, 0.7);
+  border-radius: 8px;
+  backdrop-filter: blur(10px);
+}
+
+.loading-spinner {
+  width: 40px;
+  height: 40px;
+  border: 4px solid rgba(0, 0, 0, 0.1);
+  border-top: 4px solid #409EFF;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin-bottom: 20px;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.error-container {
+  text-align: center;
+  padding: 40px 0;
+  color: #f56c6c;
+  background-color: rgba(255, 255, 255, 0.7);
+  border-radius: 8px;
+  backdrop-filter: blur(10px);
+}
+
+.error-container i {
+  font-size: 48px;
+  margin-bottom: 20px;
+}
+
+.retry-btn {
+  margin-top: 20px;
+  padding: 8px 16px;
+  background-color: #409EFF;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+  transition: all 0.3s;
+}
+
+.retry-btn:hover {
+  background-color: #3a8ee6;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.15);
+}
+
+.empty-state {
+  text-align: center;
+  padding: 40px 0;
+  color: #909399;
+  background-color: rgba(255, 255, 255, 0.7);
+  border-radius: 8px;
+  backdrop-filter: blur(10px);
+}
+
+.empty-state i {
+  font-size: 48px;
+  margin-bottom: 20px;
+}
+
+
+</style>
