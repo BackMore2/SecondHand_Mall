@@ -51,7 +51,7 @@ public class CartController {
     public Map<String, Object> clearCart(@PathVariable Long userId) {
         Map<String, Object> response = new HashMap<>();
         try {
-            cartService.clearCart(userId);
+        cartService.clearCart(userId);
             response.put("success", true);
             response.put("message", "购物车已成功清空");
         } catch (Exception e) {
