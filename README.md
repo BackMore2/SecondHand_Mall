@@ -2,3 +2,5 @@
 二手校园交易平台
 
 接入deepseek r1作为ai客服，使用springboot3和vue3作为前后端分离项目
+
+目前已经完成
