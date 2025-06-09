@@ -15,6 +15,7 @@ import ProductPublishPage from '@/views/ProductPublishPage.vue';
 import ProductPreviewPage from '@/views/ProductPreviewPage.vue';
 import ProductReviewPage from '@/views/ProductReviewPage.vue';
 import OrderReviewPage from '@/views/OrderReviewPage.vue';
+import SearchPage from '@/views/SearchPage.vue';
 
 // 修复变量名称拼写错误
 const routes = [
@@ -34,7 +35,8 @@ const routes = [
     { path: '/product/preview', component: ProductPreviewPage },
     { path: '/product/:id', component: ProductDetailPage },
     { path: '/product/:id/review', component: ProductReviewPage },
-    { path: '/order/:id/review', component: OrderReviewPage }
+    { path: '/order/:id/review', component: OrderReviewPage },
+    { path: '/search', component: SearchPage }
 ];
 
 const router = createRouter({

@@ -90,8 +90,13 @@ function toggleUserMenu() {
 }
 
 function searchProducts() {
-  // 搜索功能实现
-  console.log('搜索:', searchKeyword.value)
+  // 只有当关键词不为空时才跳转到搜索页面
+  if (searchKeyword.value.trim()) {
+    router.push({
+      path: '/search',
+      query: { keyword: searchKeyword.value.trim() }
+    })
+  }
 }
 
 function logout() {
